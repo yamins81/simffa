@@ -317,16 +317,6 @@ class TooLongException(Exception):
         return 'Would take too long to execute model (%f mins, but cutoff is %s mins)' % (tot, cutoff)
 
 
-def get_pythor_safe_description(description):
-    description = copy.deepcopy(description)
-    for layer_idx, layer_desc in enumerate(description):
-        for (op_idx,(op_name, op_params)) in enumerate(layer_desc):
-            if op_name.endswith('_h'):
-                newname = op_name[:-2]
-                layer_desc[op_idx] = (newname,op_params)
-    return description
-
-
 def flatten(x):
     return list(itertools.chain(*x))
 

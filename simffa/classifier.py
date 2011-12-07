@@ -101,15 +101,18 @@ from scikits.learn.linear_model.logistic import LogisticRegression
 
 def train_liblinear_classifier(train_Xy,
                                test_Xy,
-                               classifier_kwargs,
-                               relabel = True,
+                               classifier_kwargs=None,
+                               relabel=True,
                                trace_normalize=False):
 
     """
     Classifier using the built-in multi-class classification capabilities of liblinear
     """
 
-    train_features, train_labels = train_Xy,
+    if classifier_kwargs is None:
+        classifier_kwargs = {}
+
+    train_features, train_labels = train_Xy
     test_features, test_labels = test_Xy
 
     labels = sp.unique(sp.concatenate((train_labels, test_labels)))
@@ -119,7 +122,7 @@ def train_liblinear_classifier(train_Xy,
     else:
         train_ids = train_labels
     train_Xz = (train_features, train_ids)
-    classifier, train_mean, train_std, trace = train_liblinear_classifier_core(train_Xz
+    classifier, train_mean, train_std, trace = train_liblinear_classifier_core(train_Xz,
                                                                              trace_normalize=trace_normalize,
                                                                              **classifier_kwargs)
     train_data = {'train_mean':train_mean, 'train_std': train_std, 'trace': trace}
@@ -131,9 +134,9 @@ def train_liblinear_classifier(train_Xy,
     test_prediction = labels[classifier.predict(test_features)]
     train_prediction = labels[classifier.predict(train_features)]
     result = get_result(train_labels, test_labels, train_prediction, test_prediction, labels)
-    result['cls_data']['train_mean'] = train_mean
-    result['cls_data']['train_std'] = test_std
-    result['cls_data']['trace'] = trace
+    result['train_mean'] = train_mean
+    result['train_std'] = train_std
+    result['trace'] = trace
     return classifier, None, result
 
 
@@ -252,7 +255,7 @@ def multiclass_stats(test_actual, test_predicted, train_actual, train_predicted,
 
 
 def multiclass_test_stats(test_actual, test_predicted, labels, prefix='test'):
-    test_accuracy = float(100*(test_prediction == test_labels).sum() / float(len(test_prediction)))
+    test_accuracy = float(100*(test_predicted == test_actual).sum() / float(len(test_predicted)))
     test_aps = []
     test_aucs = []
     if len(labels) == 2:
@@ -265,9 +268,9 @@ def multiclass_test_stats(test_actual, test_predicted, labels, prefix='test'):
         test_aucs.append(test_auc)
     test_ap = np.array(test_aps).mean()
     test_auc = np.array(test_aucs).mean()
-    return {prefix+'accuracy' : test_accuracy,
-            prefix+'ap' : test_ap,
-            prefix+'auc' : test_auc}
+    return {prefix+'_accuracy' : test_accuracy,
+            prefix+'_ap' : test_ap,
+            prefix+'_auc' : test_auc}
 
 
 def precision_and_recall(actual,predicted,cls):
@@ -312,7 +315,7 @@ def normalize(feats_Xy, trace_normalize=True, data=None):
     and norms are computed relative to that one.
     """
     feats, labels = zip(*feats_Xy)
-    if data is not None:
+    if data is None:
         train_f = feats[0]
         m = train_f.mean(axis=0)
         s = np.maximum(train_f.std(axis=0), 1e-8)
@@ -326,6 +329,8 @@ def normalize(feats_Xy, trace_normalize=True, data=None):
             tr = np.maximum(np.sqrt((train_f**2).sum(axis=1)).mean(), 1e-8)
         else:
             tr = data['trace']
+    else:
+        tr = None
     if trace_normalize:
         feats = [f / tr for f in feats]
     feats_Xy = tuple(zip(feats,labels))
