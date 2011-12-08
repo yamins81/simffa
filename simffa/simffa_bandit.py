@@ -10,6 +10,31 @@ from classifier import train_liblinear_classifier
 from theano_slm import slm_from_config, FeatureExtractor
 
 
+def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catfunc=None):
+    if catfunc is None:
+        catfunc = lambda x : x['name']
+    Xr = np.array([m['filename'] for m in dataset.meta])
+    labels = np.array([catfunc(m) for m in dataset.meta])
+    labelset = set(labels)
+    splits = dataset.generate_splits(seed, ntrain, ntest, num_splits, labelset=labelset, catfunc=catfunc)
+
+    results = []
+    for ind in range(5):
+        train_split = np.array(splits['train_' + str(ind)])
+        test_split = np.array(splits['test_' + str(ind)])
+        train_inds = np.searchsorted(Xr,train_split)
+        test_inds = np.searchsorted(Xr,test_split)
+        train_X = features[train_inds]
+        test_X = features[test_inds]
+        train_y = labels[train_inds]
+        test_y = labels[test_inds]
+        train_Xy = (train_X, train_y)
+        test_Xy = (test_X, test_y)
+        result = train_liblinear_classifier(train_Xy, test_Xy)
+        results.append(result)
+
+    return results
+
 
 class SimffaBandit(gb.GensonBandit):
 
@@ -72,27 +97,71 @@ class SimffaL3Bandit(SimffaBandit):
     source_string = simffa_params.string(simffa_params.l3_params)
 
 
-def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catfunc=None):
-    if catfunc is None:
-        catfunc = lambda x : x['name']
-    Xr = np.array([m['filename'] for m in dataset.meta])
-    labels = np.array([catfunc(m) for m in dataset.meta])
-    labelset = set(labels)
-    splits = dataset.generate_splits(seed, ntrain, ntest, num_splits, labelset=labelset, catfunc=catfunc)
+import pymongo as pm
 
-    results = []
-    for ind in range(5):
-        train_split = np.array(splits['train_' + str(ind)])
-        test_split = np.array(splits['test_' + str(ind)])
-        train_inds = np.searchsorted(Xr,train_split)
-        test_inds = np.searchsorted(Xr,test_split)
-        train_X = features[train_inds]
-        test_X = features[test_inds]
-        train_y = labels[train_inds]
-        test_y = labels[test_inds]
-        train_Xy = (train_X, train_y)
-        test_Xy = (test_X, test_y)
-        result = train_liblinear_classifier(train_Xy, test_Xy)
-        results.append(result)
+def make_plots():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+    
+    exp_key1 = 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
+    exp_key2 = 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
+    exp_key3 = 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
+    exp_key1g = 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom'
+    
+    C1 = list(Jobs.find({'exp_key':exp_key1,'state':2}))
+    C2 = list(Jobs.find({'exp_key':exp_key2,'state':2}))
+    C3 = list(Jobs.find({'exp_key':exp_key3,'state':2}))
+    C1g = list(Jobs.find({'exp_key':exp_key1g,'state':2}))
 
-    return results
+    FSI_1 = np.array([c['result']['fsi_fractions'] for c in C1])
+    FSI_2 = np.array([c['result']['fsi_fractions'] for c in C2])
+    FSI_3 = np.array([c['result']['fsi_fractions'] for c in C3])
+    FSI_1g = np.array([c['result']['fsi_fractions'] for c in C1g])
+    
+    import matplotlib.pyplot as plt
+    plt.ioff()
+    plt.plot(FSI_1.mean(0))
+    plt.plot(FSI_2.mean(0))
+    plt.plot(FSI_3.mean(0))
+    plt.plot(FSI_1g.mean(0))
+    plt.legend(('L1','L2','L3','L1 Gabor'))
+    plt.ylabel('Fraction of taps with FSI > threshold')
+    plt.xlabel('Threshold')
+    plt.title('FSI fractions vs. threshold, averaged over models')
+    plt.savefig('Averages.png')
+    
+    plt.figure()
+    plt.boxplot([FSI_1[:,l*10] for l in range(10)])
+    plt.plot(range(1,11),FSI_1.mean(0)[[l*10 for l in range(10)]],color='green')
+    plt.scatter(range(1,11),FSI_1.mean(0)[[l*10 for l in range(10)]])
+    plt.title('L1 boxplot -- mean shown in green')
+    plt.xlabel('Threshold')
+    plt.ylabel('FSI at threshold')
+    plt.savefig('L1_boxplot.png')
+    plt.figure()
+    plt.boxplot([FSI_2[:,l*10] for l in range(10)])
+    plt.plot(range(1,11),FSI_2.mean(0)[[l*10 for l in range(10)]], color='green')
+    plt.scatter(range(1,11),FSI_2.mean(0)[[l*10 for l in range(10)]])
+    plt.title('L2 boxplot -- mean shown in green')
+    plt.xlabel('Threshold')
+    plt.ylabel('FSI at threshold')
+    plt.savefig('L2_boxplot.png')
+    plt.figure()
+    plt.boxplot([FSI_3[:,l*10] for l in range(10)])
+    plt.plot(range(1,11),FSI_3.mean(0)[[l*10 for l in range(10)]], color='green')
+    plt.scatter(range(1,11),FSI_3.mean(0)[[l*10 for l in range(10)]])
+    plt.title('L3 boxplot -- mean shown in green')
+    plt.xlabel('Threshold')
+    plt.ylabel('FSI at threshold')
+    plt.savefig('L3_boxplot.png')
+    plt.figure()
+    plt.boxplot([FSI_1g[:,l*10] for l in range(10)])
+    plt.plot(range(1,11),FSI_1g.mean(0)[[l*10 for l in range(10)]], color='green')
+    plt.scatter(range(1,11),FSI_1g.mean(0)[[l*10 for l in range(10)]])
+    plt.title('L1g boxplot -- mean shown in green')
+    plt.xlabel('Threshold')
+    plt.ylabel('FSI at threshold')
+    plt.savefig('L1g_boxplot.png')
+    
+    
