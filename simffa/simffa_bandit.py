@@ -107,7 +107,7 @@ class SimffaL2Bandit(SimffaBandit):
 
 
 class SimffaL2GaborBandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l1_params_gabor)
+    source_string = simffa_params.string(simffa_params.l2_params_gabor)
 
 
 class SimffaL3Bandit(SimffaBandit):
