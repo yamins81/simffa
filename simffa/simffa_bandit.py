@@ -85,6 +85,7 @@ class SimffaBandit(gb.GensonBandit):
             record['training_data'][problem] = stats
 
         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
+        print('DONE')
 
         return record
 
