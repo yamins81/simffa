@@ -133,8 +133,30 @@ filter1_gabor = dict(
                                      ),
                 kwargs=activ)
 
+filter1_gabor_larger = dict(
+                initialize=dict(
+                    filter_shape=choice([(11,11),(15,15),(19,19),(23,23)]),
+                    n_filters=choice([16,32,64]),
+                    generate=('random:gabor',
+                                     {'min_wl': 2, 'max_wl': 20 ,
+                                      'rseed': choice([11, 12, 13, 14, 15])})
+                                     ),
+                kwargs=activ)
+
 layers_gabor = [[('lnorm', lnorm)],
           [('fbcorr', filter1_gabor),
+           ('lpool', lpool),
+           ('lnorm', lnorm)],
+          [('fbcorr', filter2),
+           ('lpool' , lpool),
+           ('lnorm' , lnorm)],
+          [('fbcorr', filter3),
+           ('lpool', lpool),
+           ('lnorm', lnorm)]
+         ]
+
+layers_gabor_larger = [[('lnorm', lnorm)],
+          [('fbcorr', filter1_gabor_larger),
            ('lpool', lpool),
            ('lnorm', lnorm)],
           [('fbcorr', filter2),
@@ -148,6 +170,10 @@ layers_gabor = [[('lnorm', lnorm)],
 l1_params_gabor = {'desc' : layers_gabor[:2]}
 l2_params_gabor = {'desc' : layers_gabor[:3]}
 l3_params_gabor = {'desc' : layers_gabor}
+
+l1_params_gabor_larger = {'desc' : layers_gabor_larger[:2]}
+l2_params_gabor_larger = {'desc' : layers_gabor_larger[:3]}
+l3_params_gabor_larger = {'desc' : layers_gabor_larger}
 
 
 
