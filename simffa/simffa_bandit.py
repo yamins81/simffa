@@ -55,7 +55,7 @@ class SimffaBandit(gb.GensonBandit):
         features = get_features(dataset, config)
         fs = features.shape
         num_features = fs[1]*fs[2]*fs[3]
-        
+
         record = {}
         thresholds = np.arange(0,1,.01)
         F = features[:20].mean(0)
@@ -70,12 +70,12 @@ class SimffaBandit(gb.GensonBandit):
         record['BO_s_avg'] = BO.mean(2).tolist()
         record['FSI_s_avg'] = FSI.mean(2).tolist()
         record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
-    
+
         features = features.reshape((fs[0],num_features))
         STATS = ['train_accuracy','train_ap','train_auc','test_accuracy','test_ap','test_auc']
         catfuncs = [('Face_Nonface',lambda x : x['name'] if x['name'] == 'Face' else 'Nonface'),
                     ('Face_Body_Object',None)]
-        
+
         record['training_data'] = {}
         for (problem, func) in catfuncs:
             results = traintest(dataset, features, catfunc=func)
@@ -122,34 +122,39 @@ def make_plots():
     conn = pm.Connection()
     db = conn['hyperopt']
     Jobs = db['jobs']
-    
+
     exp_key1 = 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
     exp_key2 = 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
     exp_key3 = 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
     exp_key1g = 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'
-    
+    exp_key2g = 'simffa.simffa_bandit.SimffaL2GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'
+
+
     C1 = list(Jobs.find({'exp_key':exp_key1,'state':2}))
     C2 = list(Jobs.find({'exp_key':exp_key2,'state':2}))
     C3 = list(Jobs.find({'exp_key':exp_key3,'state':2}))
     C1g = list(Jobs.find({'exp_key':exp_key1g,'state':2}))
+    C2g = list(Jobs.find({'exp_key':exp_key1g,'state':2}))
 
     FSI_1 = np.array([c['result']['fsi_fractions'] for c in C1])
     FSI_2 = np.array([c['result']['fsi_fractions'] for c in C2])
     FSI_3 = np.array([c['result']['fsi_fractions'] for c in C3])
     FSI_1g = np.array([c['result']['fsi_fractions'] for c in C1g])
-    
+    FSI_2g = np.array([c['result']['fsi_fractions'] for c in C2g])
+
     import matplotlib.pyplot as plt
     plt.ioff()
     plt.plot(FSI_1.mean(0))
     plt.plot(FSI_2.mean(0))
     plt.plot(FSI_3.mean(0))
     plt.plot(FSI_1g.mean(0))
-    plt.legend(('L1','L2','L3','L1 Gabor'))
+    plt.plot(FSI_2g.mean(0))
+    plt.legend(('L1','L2','L3','L1 Gabor','L2 Gabor'))
     plt.ylabel('Fraction of taps with FSI > threshold')
     plt.xlabel('Threshold')
     plt.title('FSI fractions vs. threshold, averaged over models')
     plt.savefig('Averages.png')
-    
+
     plt.figure()
     plt.boxplot([FSI_1[:,l*10] for l in range(10)])
     plt.plot(range(1,11),FSI_1.mean(0)[[l*10 for l in range(10)]],color='green')
@@ -182,25 +187,34 @@ def make_plots():
     plt.xlabel('Threshold')
     plt.ylabel('FSI at threshold')
     plt.savefig('L1g_boxplot.png')
-    
+    plt.figure()
+    plt.boxplot([FSI_2g[:,l*10] for l in range(10)])
+    plt.plot(range(1,11),FSI_2g.mean(0)[[l*10 for l in range(10)]], color='green')
+    plt.scatter(range(1,11),FSI_2g.mean(0)[[l*10 for l in range(10)]])
+    plt.title('L2g boxplot -- mean shown in green')
+    plt.xlabel('Threshold')
+    plt.ylabel('FSI at threshold')
+    plt.savefig('L2g_boxplot.png')
+
+
 def make_plots2():
     conn = pm.Connection()
     db = conn['hyperopt']
     Jobs = db['jobs']
-    
+
     exp_key1 = 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
     exp_key2 = 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
     exp_key3 = 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
     exp_key1g = 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'
-    
+
     C1 = list(Jobs.find({'exp_key':exp_key1,'state':2}))
     C2 = list(Jobs.find({'exp_key':exp_key2,'state':2}))
     C3 = list(Jobs.find({'exp_key':exp_key3,'state':2}))
     C1g = list(Jobs.find({'exp_key':exp_key1g,'state':2}))
-    
+
     import matplotlib.pyplot as plt
     plt.ioff()
-    
+
     X1 = np.array([(c['result']['fsi_fractions'][10],c['result']['training_data']['Face_Nonface']['test_accuracy']) for c in C1])
     plt.figure()
     plt.plot(X1[:,0],X1[:,1],'o')
@@ -231,3 +245,73 @@ def make_plots2():
     plt.xlabel('FSI Fraction at threshold .1')
     plt.ylabel('Model Performance (test accuracy, ntrain=ntest=10, 5 splits)')
     plt.savefig('L1_FBO_performance_vs_FSI.png')
+
+import os
+def make_plots3():
+
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+
+    ekeys = [('L1', 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2', 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L3', 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L1g', 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2g', 'simffa.simffa_bandit.SimffaL2GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial')]
+
+    import matplotlib.pyplot as plt
+
+    for (n,k) in ekeys:
+        os.mkdir(n + '_Face_selective')
+        C  = list(Jobs.find({'exp_key':k,'state':2}))
+        for (ind,c) in enumerate(C):
+            A = np.array(c['result']['Face_selective_s_avg'])
+            plt.imshow(A)
+            plt.savefig(n + '_Face_selective/' + str(ind) + '.png')
+
+
+import os
+def make_plots4():
+
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+
+    ekeys = [('L1', 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2', 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L3', 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L1g', 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2g', 'simffa.simffa_bandit.SimffaL2GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial')]
+
+    import matplotlib.pyplot as plt
+
+    for (n,k) in ekeys:
+        os.mkdir(n + '_Faces_avg')
+        C  = list(Jobs.find({'exp_key':k,'state':2}))
+        for (ind,c) in enumerate(C):
+            A = np.array(c['result']['F_s_avg'])
+            plt.imshow(A)
+            plt.savefig(n + '_Faces_avg/' + str(ind) + '.png')
+
+
+def compute_blobiness():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+
+    ekeys = [('L1', 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2', 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L3', 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L1g', 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2g', 'simffa.simffa_bandit.SimffaL2GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial')]
+
+    import matplotlib.pyplot as plt
+    things = []
+    func = lambda x : -np.log(np.abs((x - x.mean())/len(x.ravel())).mean())
+    for (n,k) in ekeys:
+        C  = list(Jobs.find({'exp_key':k,'state':2}))
+        A = [np.array(c['result']['Face_selective_s_avg']) for c in C]
+        B = map(lambda x : func(x),filter(lambda x : (x > 0).any(),A))
+        things.append(np.mean(B))
+
+    return things
