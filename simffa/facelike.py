@@ -18,7 +18,7 @@ import numpy as np
 from scipy.io import loadmat
 
 import skdata.larray as larray
-from stdata.data_home import get_data_home
+from skdata.data_home import get_data_home
 from skdata.utils import download_boto, extract, int_labels
 from skdata.utils.image import ImgLoader
 
@@ -102,10 +102,9 @@ class BaseFacelike(object):
             ind = int(os.path.split(img_filename)[1].split('.')[0][2:])
             ratings = imratingdict[ind]
 
-            data = dict(name=name,
-                        id=ind,
+            data = dict(id=ind,
                         filename=img_filename,
-                        rating=rating,
+                        ratings=ratings,
                         avg_rating=np.mean(ratings),
                         sha1=sha1)
             meta += [data]
