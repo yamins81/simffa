@@ -70,14 +70,15 @@ lnorm = {'kwargs':{'inker_shape' : choice([(3,3),(5,5),(7,7),(9,9)]),
          'threshold' : choice([.1,1,10])
          }}
 
-lpool = {'kwargs': {'stride' : 2,
+lpool = {'kwargs': {'stride' : 1,
           'ker_shape' : choice([(3,3),(5,5),(7,7),(9,9)]),
           'order' : choice([1,2,10])
          }}
 
+rescale = {'kwargs': {'stride': 2}}
 
-activ =  {'min_out' : choice([null,0]),
-          'max_out' : choice([1,null])}
+activ =  {'kwargs': {'min_out' : choice([null,0]),
+                     'max_out' : choice([1,null])}}
 
 filter1 = dict(
         initialize=dict(
@@ -86,38 +87,34 @@ filter1 = dict(
             generate=(
                 'random:uniform',
                 {'rseed': choice([11, 12, 13, 14, 15])})),
-         kwargs=activ)
+         kwargs={})
 
-filter2 = dict(
-        initialize=dict(
-            filter_shape=choice([(3, 3), (5, 5), (7, 7), (9, 9)]),
-            n_filters=choice([16, 32, 64, 128]),
-            generate=(
-                'random:uniform',
-                {'rseed': choice([21, 22, 23, 24, 25])})),
-         kwargs=activ)
+filter2 = copy.deepcopy(filter1)
+filter2['initialize']['n_filters'] = choice([16, 32, 64, 128])
+filter2['initialize']['generate'] = ('random:uniform', {'rseed': choice(range(5,10))})
 
-filter3 = dict(
-        initialize=dict(
-            filter_shape=choice([(3, 3), (5, 5), (7, 7), (9, 9)]),
-            n_filters=choice([16, 32, 64, 128, 256]),
-            generate=(
-                'random:uniform',
-                {'rseed': choice([31, 32, 33, 34, 35])})),
-         kwargs=activ)
+filter3 = copy.deepcopy(filter1)
+filter3['initialize']['n_filters'] = choice([16, 32, 64, 128, 256])
+filter3['initialize']['generate'] = ('random:uniform', {'rseed': choice(range(10,15))})
+
 
 layers = [[('lnorm', lnorm)],
-          [('fbcorr', filter1),
-           ('lpool', lpool),
-           ('lnorm', lnorm)],
-          [('fbcorr', filter2),
-           ('lpool' , lpool),
-           ('lnorm' , lnorm)],
-          [('fbcorr', filter3),
-           ('lpool', lpool),
-           ('lnorm', lnorm)]
-         ]
-
+            [('fbcorr', filter1),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+            [('fbcorr', filter2),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+            [('fbcorr', filter3),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+           ]}
 
 l1_params = {'desc' : layers[:2]}
 l2_params = {'desc' : layers[:3]}
@@ -131,7 +128,7 @@ filter1_gabor = dict(
                                      {'min_wl': 2, 'max_wl': 20 ,
                                       'rseed': choice([11, 12, 13, 14, 15])})
                                      ),
-                kwargs=activ)
+                kwargs={})
 
 filter1_gabor_larger = dict(
                 initialize=dict(
@@ -141,31 +138,43 @@ filter1_gabor_larger = dict(
                                      {'min_wl': 2, 'max_wl': 20 ,
                                       'rseed': choice([11, 12, 13, 14, 15])})
                                      ),
-                kwargs=activ)
+                kwargs={})
 
 layers_gabor = [[('lnorm', lnorm)],
-          [('fbcorr', filter1_gabor),
-           ('lpool', lpool),
-           ('lnorm', lnorm)],
-          [('fbcorr', filter2),
-           ('lpool' , lpool),
-           ('lnorm' , lnorm)],
-          [('fbcorr', filter3),
-           ('lpool', lpool),
-           ('lnorm', lnorm)]
-         ]
-
+            [('fbcorr', filter1_gabor),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+            [('fbcorr', filter2),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+            [('fbcorr', filter3),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+           ]}
+           
 layers_gabor_larger = [[('lnorm', lnorm)],
-          [('fbcorr', filter1_gabor_larger),
-           ('lpool', lpool),
-           ('lnorm', lnorm)],
-          [('fbcorr', filter2),
-           ('lpool' , lpool),
-           ('lnorm' , lnorm)],
-          [('fbcorr', filter3),
-           ('lpool', lpool),
-           ('lnorm', lnorm)]
-         ]
+            [('fbcorr', filter1_gabor_larger),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+            [('fbcorr', filter2),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+            [('fbcorr', filter3),
+             ('activ', activ),
+             ('lpool', lpool),
+             ('rescale', rescale),
+             ('lnorm', lnorm)],
+           ]}           
 
 l1_params_gabor = {'desc' : layers_gabor[:2]}
 l2_params_gabor = {'desc' : layers_gabor[:3]}

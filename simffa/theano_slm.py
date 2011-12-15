@@ -316,75 +316,8 @@ class TooLongException(Exception):
     def msg(tot, cutoff):
         return 'Would take too long to execute model (%f mins, but cutoff is %s mins)' % (tot, cutoff)
 
-
-def flatten(x):
-    return list(itertools.chain(*x))
-
-def interpret_activ(filter, activ):
-    n_filters = filter['initialize']['n_filters']
-    generator = activ['generate'][0].split(':')
-    vals = activ['generate'][1]
-
-    if generator[0] == 'random':
-        dist = generator[1]
-        if dist == 'uniform':
-            mean = vals['mean']
-            delta = vals['delta']
-            seed = vals['rseed']
-            rng = np.random.RandomState(seed)
-            low = mean-(delta/2)
-            high = mean+(delta/2)
-            size = (n_filters,)
-            activ_vec = rng.uniform(low=low, high=high, size=size)
-        elif dist == 'normal':
-            mean = vals['mean']
-            stdev = vals['stdev']
-            seed = vals['rseed']
-            rng = np.random.RandomState(seed)
-            size = (n_filters,)
-            activ_vec = rng.normal(loc=mean, scale=stdev, size=size)
-        else:
-            raise ValueError, 'distribution not recognized'
-    elif generator[0] == 'fixedvalues':
-        values = vals['values']
-        num = n_filters / len(values)
-        delta = n_filters - len(values)*num
-        activ_vec = flatten([[v]*num for v in values] + [[values[-1]]*delta])
-    else:
-        raise ValueError, 'not recognized'
-
-    return activ_vec
-
 def interpret_model(desc):
     for layer in desc:
         for (ind,(opname,opparams)) in enumerate(layer):
-
-            if opname == 'fbcorr_h':
-                kw = opparams['kwargs']
-                if hasattr(kw.get('min_out'),'keys'):
-                    kw['min_out'] = interpret_activ(opparams, kw['min_out'])
-                if hasattr(kw.get('max_out'),'keys'):
-                    kw['max_out'] = interpret_activ(opparams, kw['max_out'])
-            elif opname == 'lpool_h':
-                kw = opparams['kwargs']
-                if hasattr(kw.get('order'),'keys'):
-                    kw['order'] = interpret_activ(layer[0][1], kw['order'])
-
-            if opname in ['fbcorr', 'fbcorr_h']:
-                init = opparams['initialize']
-                if init.has_key('filter_size'):
-                    sz = init.pop('filter_size')
-                    init['filter_shape'] = (2*sz+1, 2*sz+1)
-            elif opname in ['lnorm', 'lnorm_h']:
-                init = opparams['kwargs']
-                if init.has_key('inker_size'):
-                    sz = init.pop('inker_size')
-                    init['inker_shape'] = (2*sz+1, 2*sz+1)
-                if init.has_key('outker_size'):
-                    sz = init.pop('outker_size')
-                    init['outker_shape'] = (2*sz+1, 2*sz+1)
-            elif opname in ['lpool', 'lpool_h']:
-                init = opparams['kwargs']
-                if init.has_key('ker_size'):
-                    sz = init.pop('ker_size')
-                    init['ker_shape'] = (2*sz+1, 2*sz+1)
+            if opname not in ['fbcorr', 'lpool', 'lnorm', 'rescale', 'activ']:
+                raise NotImplementedError('Op %s not implemented in this branch' % opname)
