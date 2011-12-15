@@ -2,14 +2,12 @@ import copy
 
 import pymongo as pm
 import numpy as np
-from thoreano.slm import TheanoSLM
 import skdata.fbo
 import hyperopt.genson_bandits as gb
+from thoreano.slm import slm_from_config, FeatureExtractor
+from thoreano.classifier import train_scikits
 
 import simffa_params
-from classifier import train_liblinear_classifier
-from theano_slm import slm_from_config, FeatureExtractor
-
 
 def get_features(dataset, config):
 	X, y = dataset.img_classification_task()
@@ -38,7 +36,7 @@ def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catf
         test_y = labels[test_inds]
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
-        result = train_liblinear_classifier(train_Xy, test_Xy)
+        result = train_scikits(train_Xy, test_Xy, 'liblinear', regresion=False)
         results.append(result)
     return results
 
@@ -313,7 +311,7 @@ def compute_blobiness():
         A = [np.array(c['result']['Face_selective_s_avg']) for c in C]
         B = map(lambda x : func(x),filter(lambda x : (x > 0).any(),A))
         things.append(B)
-    
+
     plt.figure()
     plt.boxplot(things)
     plt.plot(range(1,6),[np.mean(t) for t in things],color='green')

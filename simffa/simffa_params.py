@@ -114,7 +114,7 @@ layers = [[('lnorm', lnorm)],
              ('lpool', lpool),
              ('rescale', rescale),
              ('lnorm', lnorm)],
-           ]}
+           ]
 
 l1_params = {'desc' : layers[:2]}
 l2_params = {'desc' : layers[:3]}
@@ -156,8 +156,8 @@ layers_gabor = [[('lnorm', lnorm)],
              ('lpool', lpool),
              ('rescale', rescale),
              ('lnorm', lnorm)],
-           ]}
-           
+           ]
+
 layers_gabor_larger = [[('lnorm', lnorm)],
             [('fbcorr', filter1_gabor_larger),
              ('activ', activ),
@@ -174,7 +174,8 @@ layers_gabor_larger = [[('lnorm', lnorm)],
              ('lpool', lpool),
              ('rescale', rescale),
              ('lnorm', lnorm)],
-           ]}           
+            ]
+
 
 l1_params_gabor = {'desc' : layers_gabor[:2]}
 l2_params_gabor = {'desc' : layers_gabor[:3]}
