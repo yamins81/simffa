@@ -1,3 +1,6 @@
+"""
+# MUST be run with feature/separate_activation branch of thoreano
+"""
 import copy
 
 import pymongo as pm
