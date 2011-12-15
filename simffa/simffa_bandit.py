@@ -4,6 +4,7 @@ import pymongo as pm
 import numpy as np
 import skdata.fbo
 import hyperopt.genson_bandits as gb
+import hyperopt.genson_helpers as gh
 from thoreano.slm import slm_from_config, FeatureExtractor
 from thoreano.classifier import train_scikits
 
@@ -89,31 +90,31 @@ class SimffaBandit(gb.GensonBandit):
 
 
 class SimffaL1Bandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l1_params)
+    source_string = gh.string(simffa_params.l1_params)
 
 
 class SimffaL1GaborBandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l1_params_gabor)
+    source_string = gh.string(simffa_params.l1_params_gabor)
 
 
 class SimffaL1GaborLargerBandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l1_params_gabor_larger)
+    source_string = gh.string(simffa_params.l1_params_gabor_larger)
 
 
 class SimffaL2Bandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l2_params)
+    source_string = gh.string(simffa_params.l2_params)
 
 
 class SimffaL2GaborBandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l2_params_gabor)
+    source_string = gh.string(simffa_params.l2_params_gabor)
 
 
 class SimffaL3Bandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l3_params)
+    source_string = gh.string(simffa_params.l3_params)
 
 
 class SimffaL3GaborBandit(SimffaBandit):
-    source_string = simffa_params.string(simffa_params.l1_params_gabor)
+    source_string = gh.string(simffa_params.l1_params_gabor)
 
 
 def make_plots():
