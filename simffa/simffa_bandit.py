@@ -40,7 +40,7 @@ def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catf
         test_y = labels[test_inds]
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
-        result = train_scikits(train_Xy, test_Xy, 'liblinear', regresion=False)
+        result = train_scikits(train_Xy, test_Xy, 'liblinear', regression=False)
         results.append(result)
     return results
 
@@ -327,3 +327,82 @@ def compute_blobiness():
     plt.savefig('Inverse_Peakiness.png')
 
     return things
+
+
+
+######facelike regression
+
+import facelike
+
+def regression_traintest(dataset, features, regfunc, seed=0, ntrain=50, ntest=50, num_splits=5):
+    Xr = np.array([m['filename'] for m in dataset.meta])
+    labels = np.array([regfunc(m) for m in dataset.meta])
+    splits = dataset.generate_splits(seed, ntrain, ntest, num_splits)
+    results = []
+    for ind in range(5):
+        train_split = np.array(splits['train_' + str(ind)])
+        test_split = np.array(splits['test_' + str(ind)])
+        train_inds = np.searchsorted(Xr,train_split)
+        test_inds = np.searchsorted(Xr,test_split)
+        train_X = features[train_inds]
+        test_X = features[test_inds]
+        train_y = labels[train_inds]
+        test_y = labels[test_inds]
+        train_Xy = (train_X, train_y)
+        test_Xy = (test_X, test_y)
+        result = train_scikits(train_Xy, test_Xy, 'LinearRegression', regression=True)
+        results.append(result)
+    return results
+
+class SimffaFacelikeBandit(gb.GensonBandit):
+    """
+    call with bandit-argfile supplying credentials
+    """
+    def __init__(self, credentials):
+        super(SimffaBandit, self).__init__(source_string=self.source_string)
+        self.credentials = tuple(credentials)
+
+    @classmethod
+    def evaluate(cls, config, ctrl):
+
+        dataset = facelike.Facelike(self.credentials)
+
+        features = get_features(dataset, config)
+        fs = features.shape
+        num_features = fs[1]*fs[2]*fs[3]
+
+        record = {}
+        thresholds = np.arange(0,1,.01)
+        F = features[:20].mean(0)
+        BO = features[20:].mean(0)
+        FSI = (F - BO) / (np.abs(F) + np.abs(BO))
+        FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
+        FSI_fractions = [c/ float(num_features) for c in FSI_counts]
+        record['num_features'] = num_features
+        record['thresholds'] = thresholds.tolist()
+        record['fsi_fractions'] = FSI_fractions
+        record['F_s_avg'] = F.mean(2).tolist()
+        record['BO_s_avg'] = BO.mean(2).tolist()
+        record['FSI_s_avg'] = FSI.mean(2).tolist()
+        record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
+
+        features = features.reshape((fs[0],num_features))
+        STATS = ['train_error','test_error']
+        regfuncs = [('avg',lambda x: x['avg_rating'])] + \
+                   [(ind, lambda x: x['ratings'][ind]) for ind in range(5)]
+
+        record['training_data'] = {}
+
+        for (problem, func) in catfuncs:
+            results = regression_traintest(dataset, features, regfunc)
+            stats = {}
+            for stat in STATS:
+                stats[stat] = np.mean([r[2][stat] for r in results])
+            record['training_data'][problem] = stats
+
+        record['loss'] = record['training_data']['avg']['test_error']
+        print('DONE')
+
+        return record
+
+
