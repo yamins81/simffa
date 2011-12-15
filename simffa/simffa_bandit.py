@@ -312,6 +312,16 @@ def compute_blobiness():
         C  = list(Jobs.find({'exp_key':k,'state':2}))
         A = [np.array(c['result']['Face_selective_s_avg']) for c in C]
         B = map(lambda x : func(x),filter(lambda x : (x > 0).any(),A))
-        things.append(np.mean(B))
+        things.append(B)
+    
+    plt.figure()
+    plt.boxplot(things)
+    plt.plot(range(1,6),[np.mean(t) for t in things],color='green')
+    plt.scatter(range(1,6),[np.mean(t) for t in things])
+    plt.title('Inverse Peakiness -- mean shown in green')
+    plt.xlabel('Threshold')
+    plt.ylabel('FSI at threshold')
+    plt.xticks(range(1,6), zip(*ekeys)[0])
+    plt.savefig('Inverse_Peakiness.png')
 
     return things
