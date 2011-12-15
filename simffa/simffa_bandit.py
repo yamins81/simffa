@@ -66,6 +66,7 @@ class SimffaBandit(gb.GensonBandit):
         FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
         FSI_fractions = [c/ float(num_features) for c in FSI_counts]
         record['num_features'] = num_features
+        record['feature_shape'] = fs
         record['thresholds'] = thresholds.tolist()
         record['fsi_fractions'] = FSI_fractions
         record['F_s_avg'] = F.mean(2).tolist()
@@ -83,9 +84,8 @@ class SimffaBandit(gb.GensonBandit):
             results = traintest(dataset, features, catfunc=func)
             stats = {}
             for stat in STATS:
-                stats[stat] = np.mean([r[2][stat] for r in results])
+                stats[stat] = np.mean([r[1][stat] for r in results])
             record['training_data'][problem] = stats
-
         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
 
@@ -354,6 +354,7 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=50, ntest=50
         results.append(result)
     return results
 
+
 class SimffaFacelikeBandit(gb.GensonBandit):
     """
     call with bandit-argfile supplying credentials
@@ -379,6 +380,7 @@ class SimffaFacelikeBandit(gb.GensonBandit):
         FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
         FSI_fractions = [c/ float(num_features) for c in FSI_counts]
         record['num_features'] = num_features
+        record['feature_shape'] = fs
         record['thresholds'] = thresholds.tolist()
         record['fsi_fractions'] = FSI_fractions
         record['F_s_avg'] = F.mean(2).tolist()
@@ -397,7 +399,7 @@ class SimffaFacelikeBandit(gb.GensonBandit):
             results = regression_traintest(dataset, features, regfunc)
             stats = {}
             for stat in STATS:
-                stats[stat] = np.mean([r[2][stat] for r in results])
+                stats[stat] = np.mean([r[1][stat] for r in results])
             record['training_data'][problem] = stats
 
         record['loss'] = record['training_data']['avg']['test_error']
