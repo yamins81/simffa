@@ -390,7 +390,7 @@ class SimffaFacelikeBandit(gb.GensonBandit):
         features = features.reshape((fs[0],num_features))
         STATS = ['train_error','test_error']
         regfuncs = [('avg',lambda x: x['avg_rating'])] + \
-                   [(ind, lambda x: x['ratings'][ind]) for ind in range(5)]
+                   [('subject_' + str(ind), lambda x: x['ratings'][ind]) for ind in range(5)]
 
         record['training_data'] = {}
 
