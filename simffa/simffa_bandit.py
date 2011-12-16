@@ -13,10 +13,9 @@ from thoreano.classifier import train_scikits
 
 import simffa_params
 
-def get_features(dataset, config):
-	X, y = dataset.img_classification_task()
+def get_features(X, config):
 	batchsize = 4
-	slm = slm_from_config(config, X.shape, batchsize=batchsize, use_theano=True)
+	slm = slm_from_config(config, X.shape, batchsize=batchsize)
 	extractor = FeatureExtractor(X, slm, batchsize=batchsize)
 	features = extractor.compute_features(use_memmap=False)
 	return features
@@ -54,7 +53,8 @@ class SimffaBandit(gb.GensonBandit):
     def evaluate(cls, config, ctrl):
 
         dataset = skdata.fbo.FaceBodyObject20110803()
-        features = get_features(dataset, config)
+        X, y = dataset.img_classification_task()
+        features = get_features(X, config)
         fs = features.shape
         num_features = fs[1]*fs[2]*fs[3]
 
@@ -350,7 +350,7 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=50, ntest=50
         test_y = labels[test_inds]
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
-        result = train_scikits(train_Xy, test_Xy, 'LinearRegression', regression=True)
+        result = train_scikits(train_Xy, test_Xy, 'linear_model.LinearRegression', regression=True)
         results.append(result)
     return results
 
@@ -360,15 +360,14 @@ class SimffaFacelikeBandit(gb.GensonBandit):
     call with bandit-argfile supplying credentials
     """
     def __init__(self, credentials):
-        super(SimffaBandit, self).__init__(source_string=self.source_string)
+        super(SimffaFacelikeBandit, self).__init__(source_string=self.source_string)
         self.credentials = tuple(credentials)
 
-    @classmethod
-    def evaluate(cls, config, ctrl):
+    def evaluate(self, config, ctrl):
 
         dataset = facelike.Facelike(self.credentials)
-
-        features = get_features(dataset, config)
+        X, y = dataset.img_regression_task()
+        features = get_features(X, config)
         fs = features.shape
         num_features = fs[1]*fs[2]*fs[3]
 
@@ -395,8 +394,8 @@ class SimffaFacelikeBandit(gb.GensonBandit):
 
         record['training_data'] = {}
 
-        for (problem, func) in catfuncs:
-            results = regression_traintest(dataset, features, regfunc)
+        for (problem, func) in regfuncs:
+            results = regression_traintest(dataset, features, func)
             stats = {}
             for stat in STATS:
                 stats[stat] = np.mean([r[1][stat] for r in results])
@@ -406,5 +405,34 @@ class SimffaFacelikeBandit(gb.GensonBandit):
         print('DONE')
 
         return record
+
+
+class SimffaFacelikeL1Bandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l1_params)
+
+
+class SimffaFacelikeL2Bandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l2_params)
+
+
+class SimffaFacelikeL3Bandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l3_params)
+
+
+class SimffaFacelikeL1GaborBandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l1_params_gabor)
+
+
+class SimffaFacelikeL1GaborLargerBandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l1_params_gabor_larger)
+
+
+class SimffaFacelikeL2GaborBandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l2_params_gabor)
+
+
+class SimffaFacelikeL3GaborBandit(SimffaFacelikeBandit):
+    source_string = gh.string(simffa_params.l1_params_gabor)
+
 
 

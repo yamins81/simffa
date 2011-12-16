@@ -168,7 +168,7 @@ class BaseFacelike(object):
         return image_paths, labels
 
     def img_regression_task(self, dtype='uint8', split=None, judgement='avg'):
-        img_paths, labels = self.raw_classification_task(split=split, judgement=judgement)
+        img_paths, labels = self.raw_regression_task(split=split, judgement=judgement)
         imgs = larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype=dtype, mode='L'),
                            img_paths)
         return imgs, labels
