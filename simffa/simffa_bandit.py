@@ -13,10 +13,10 @@ from thoreano.classifier import train_scikits
 
 import simffa_params
 
-def get_features(X, config):
+def get_features(X, config, verbose=False):
 	batchsize = 4
 	slm = slm_from_config(config, X.shape, batchsize=batchsize)
-	extractor = FeatureExtractor(X, slm, batchsize=batchsize)
+	extractor = FeatureExtractor(X, slm, batchsize=batchsize, verbose=verbose)
 	features = extractor.compute_features(use_memmap=False)
 	return features
 
@@ -339,7 +339,7 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=105, ntest=1
     labels = np.array([regfunc(m) for m in dataset.meta])
     splits = dataset.generate_splits(seed, ntrain, ntest, num_splits)
     results = []
-    for ind in range(5):
+    for ind in range(num_splits):
         train_split = np.array(splits['train_' + str(ind)])
         test_split = np.array(splits['test_' + str(ind)])
         train_inds = np.searchsorted(Xr,train_split)
@@ -389,12 +389,15 @@ class SimffaFacelikeBandit(gb.GensonBandit):
 
         features = features.reshape((fs[0],num_features))
         STATS = ['train_error','test_error']
-        regfuncs = [('avg',lambda x: x['avg_rating'])] + \
-                   [('subject_' + str(ind), lambda x: x['ratings'][ind]) for ind in range(5)]
-
+        reglabels = ['avg'] + ['subject_' + str(ind) for ind in range(5)]
+      
         record['training_data'] = {}
 
-        for (problem, func) in regfuncs:
+        for problem in reglabels:
+            if problem == 'avg':
+                func = lambda x: x['avg_rating']
+            else:
+                func = lambda x: x['ratings'][int(problem.split('_')[-1])]
             results = regression_traintest(dataset, features, func)
             stats = {}
             for stat in STATS:
