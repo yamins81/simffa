@@ -334,7 +334,7 @@ def compute_blobiness():
 
 import facelike
 
-def regression_traintest(dataset, features, regfunc, seed=0, ntrain=105, ntest=10, num_splits=5):
+def regression_traintest(dataset, features, regfunc, seed=0, ntrain=50, ntest=50, num_splits=5):
     Xr = np.array([m['filename'] for m in dataset.meta])
     labels = np.array([regfunc(m) for m in dataset.meta])
     splits = dataset.generate_splits(seed, ntrain, ntest, num_splits)
@@ -350,7 +350,7 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=105, ntest=1
         test_y = labels[test_inds]
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
-        result = train_scikits(train_Xy, test_Xy, 'linear_model.LinearRegression', regression=True)
+        result = train_scikits(train_Xy, test_Xy, 'linear_model.LassoCV', regression=True)
         results.append(result)
     return results
 
