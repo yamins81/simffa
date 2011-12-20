@@ -17,26 +17,26 @@ def prod(x):
         return x[0]
     else:
         return x[0]*prod(x[1:])
-        
+
 def pearsonr(x, y):
     """
-    generalized from scipy.stats.pearsonr 
+    generalized from scipy.stats.pearsonr
     """
     # x and y should have same length.
     x_shape = x.shape
     if len(x_shape) > 1:
         x = x.reshape((x_shape[0],prod(x_shape[1:])))
-    
+
     x = np.asarray(x)
     y = np.asarray(y)
     n = len(x)
     mx = x.mean(0)
     my = y.mean()
     xm, ym = x-mx, y-my
-    
+
     r_num = n*np.dot(xm.T,ym)
     r_den = n*np.sqrt(ss(xm)*ss(ym))
-    
+
     r = (r_num / r_den)
 
     # Presumably, if r > 1, then it is only some small artifact of floating
@@ -50,13 +50,13 @@ def pearsonr(x, y):
     TINY = 1.0e-20
     t = r*np.sqrt(df/((1.0-r+TINY)*(1.0+r+TINY)))
     prob = betai(0.5*df,0.5,df/(df+t*t))
-    
+
     if len(x_shape) > 1:
         r = r.reshape(x_shape[1:])
         prob = prob.reshape(x_shape[1:])
-    
+
     return r,prob
-    
+
 
 def spearmanr(a, b=None, axis=0):
     """
@@ -68,14 +68,14 @@ def spearmanr(a, b=None, axis=0):
 
     a, axisout = _chk_asarray(a, axis)
     ar = np.apply_along_axis(rankdata,axisout,a)
-    
+
     br = None
     if not b is None:
         b, axisout = _chk_asarray(b, axis)
         br = np.apply_along_axis(rankdata,axisout,b)
     n = a.shape[axisout]
     if len(ar.shape) == 2:
-        rs0 = np.corrcoef(ar.T,br)[:,-1][:-1]
+        rs0 = corrcoefk(np.vstack((ar.T,br)), -1)[:-1]
         rs = np.ones((2,2,ar.shape[1]))
         rs[0,1,:] = rs0
         rs[1,0,:] = -rs0
@@ -84,13 +84,42 @@ def spearmanr(a, b=None, axis=0):
 
     t = rs * np.sqrt((n-2) / ((rs+1.0)*(1.0-rs)))
     prob = distributions.t.sf(np.abs(t),n-2)*2
-    
+
     if rs.shape[:2] == (2,2):
         rs, prob = rs[0,1], prob[1,0]
 
     if len(a_shape) > 1:
         rs = rs.reshape(a_shape[1:])
         prob = prob.reshape(a_shape[1:])
-    
+
     return rs, prob
-        
+
+
+def cov(a):
+    n = a.shape[1]
+    return (1./(n-1))*np.inner(a,a) - (1./n)*(1./(n-1))*np.outer(a.sum(1),a.sum(1))
+
+
+def corrcoef(a):
+    c = cov(a)
+    d = np.diagonal(c)
+    return cov(a) / np.sqrt(np.outer(d,d))
+
+
+def covk(a, k):
+    n = a.shape[1]
+    s = a.sum(1)
+    return (1./(n-1))*np.dot(a,a[k]) - (1./n)*(1./(n-1))*s[k]*s
+
+
+def covd(a):
+    n = a.shape[1]
+    s = a.sum(1)
+    return (1./(n-1))*(a**2).sum(1) - (1./n)*(1./(n-1))*s**2
+
+
+def corrcoefk(a, k):
+    c = covk(a, k)
+    d = covd(a)
+    return c / np.sqrt(d * d[k])
+
