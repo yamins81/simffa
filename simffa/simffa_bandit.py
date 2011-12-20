@@ -55,7 +55,7 @@ def evaluate_FSI(config):
         record = {}
         record['num_features'] = num_features
         record['feature_shape'] = fs
-        
+
         thresholds = np.arange(0,1,.01)
         F = features[:20].mean(0)
         BO = features[20:].mean(0)
@@ -81,7 +81,7 @@ def evaluate_FSI(config):
             for stat in STATS:
                 stats[stat] = np.mean([r[1][stat] for r in results])
             record['training_data'][problem] = stats
-        
+
         return record, FSI
 
 
@@ -378,9 +378,9 @@ def evaluate_facelike(config, credentials, FSI=None):
     record = {}
     record['num_features'] = num_features
     record['feature_shape'] = fs
-    
+
     subjects = [('subject_avg','avg')] # + [('subject_' + str(ind),ind) for ind in range(5)]
-    
+
     bins = np.arange(-1, 1, .01)
     record['bins'] = bins.tolist()
     for subject, judgement in subjects:
@@ -393,6 +393,9 @@ def evaluate_facelike(config, credentials, FSI=None):
             label_subset = labels[inds]
             P, P_prob = pearsonr(f_subset, label_subset)
             S, S_prob = spearmanr(f_subset, label_subset)
+            P = np.ma.masked_array(P,np.isnan(P))
+            S = np.ma.masked_array(S,np.isnan(S))
+
             data = {}
             data['Pearson_hist'] = np.histogram(P, bins)[0].tolist()
             data['Pearson_avg'] = P.mean()
@@ -413,16 +416,16 @@ def evaluate_facelike(config, credentials, FSI=None):
                 data['Spearman_hist_sel'] = np.histogram(S[sel_inds], bins)[0].tolist()
                 data['Spearman_avg_sel'] = S[sel_inds].mean()
                 data['Spearman_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], S[sel_inds])
-                
+
             record[subject][name] = data
-        
+
         #r_cp = copy.deepcopy(record[subject])
         #r_cp.pop('all')
         #record[subject]['subset_avg'] = dict_avg(r_cp)
 
     return record
-    
-    
+
+
 class SimffaFacelikeBandit(gb.GensonBandit):
     """
     call with bandit-argfile supplying credentials
