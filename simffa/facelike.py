@@ -154,13 +154,30 @@ class BaseFacelike(object):
     # -- Standard Tasks
     # ------------------------------------------------------------------------
 
-    def raw_regression_task(self, split=None, judgement='avg'):
-        """Return image_paths, labels"""
+    def labels(self, split = None, judgement='avg'):
         if split:
             inds = self.splits[split]
         else:
             inds = xrange(len(self.meta))
-        image_paths = [self.meta[ind]['filename'] for ind in inds]
+        if judgement == 'avg':
+            labels = np.asarray([self.meta[ind]['avg_rating'] for ind in inds])
+        else:
+            labels = np.asarray([self.meta[ind]['rating'][judgement] for ind in inds])
+        return labels
+            
+    def raw_regression_task(self, split=None, subset=None, judgement='avg'):
+        """Return image_paths, labels"""
+        if split:
+            inds = self.splits[split]
+        else:
+            inds = np.array(range(len(self.meta)))
+        image_paths = np.array([self.meta[ind]['filename'] for ind in inds])
+        if subset is not None:
+            subset = map(str,subset)
+            image_ids = np.array([os.path.split(p)[-1].split('.')[0][2:] for p in image_paths])
+            sub_inds = np.searchsorted(image_ids, subset)
+            inds = inds[sub_inds]
+            image_paths = image_paths[sub_inds]
         if judgement == 'avg':
             labels = np.asarray([self.meta[ind]['avg_rating'] for ind in inds])
         else:
@@ -179,4 +196,10 @@ class Facelike(BaseFacelike):
     URL = 'http://dicarlo-faces.s3.amazonaws.com/Facelike_images.zip'
     SHA1 = 'b0cca14daa1b5545bcbf7b0eb40f588fdb25e8ca'
     SUBDIR = 'Facelike_images'
+    SUBSETS = [('eye', range(603, 612)),
+               ('nose', range(643, 652)),
+               ('eye-eye', range(612,620) + range(636, 643)),
+               ('eye-nose', range(620, 629) + range(652, 659)),
+               ('eye-mouth', range(628, 636) + range(668,675))
+              ] 
 

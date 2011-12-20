@@ -12,13 +12,14 @@ from thoreano.slm import slm_from_config, FeatureExtractor
 from thoreano.classifier import train_scikits
 
 import simffa_params
+from stats import pearsonr, spearmanr
 
 def get_features(X, config, verbose=False):
-	batchsize = 4
-	slm = slm_from_config(config, X.shape, batchsize=batchsize)
-	extractor = FeatureExtractor(X, slm, batchsize=batchsize, verbose=verbose)
-	features = extractor.compute_features(use_memmap=False)
-	return features
+    batchsize = 4
+    slm = slm_from_config(config, X.shape, batchsize=batchsize)
+    extractor = FeatureExtractor(X, slm, batchsize=batchsize, verbose=verbose)
+    features = extractor.compute_features(use_memmap=False)
+    return features
 
 def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catfunc=None):
     if catfunc is None:
@@ -44,14 +45,7 @@ def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catf
     return results
 
 
-class SimffaBandit(gb.GensonBandit):
-
-    def __init__(self):
-        super(SimffaBandit, self).__init__(source_string=self.source_string)
-
-    @classmethod
-    def evaluate(cls, config, ctrl):
-
+def evaluate_FSI(config):
         dataset = skdata.fbo.FaceBodyObject20110803()
         X, y = dataset.img_classification_task()
         features = get_features(X, config)
@@ -59,14 +53,15 @@ class SimffaBandit(gb.GensonBandit):
         num_features = fs[1]*fs[2]*fs[3]
 
         record = {}
+        record['num_features'] = num_features
+        record['feature_shape'] = fs
+        
         thresholds = np.arange(0,1,.01)
         F = features[:20].mean(0)
         BO = features[20:].mean(0)
         FSI = (F - BO) / (np.abs(F) + np.abs(BO))
         FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
         FSI_fractions = [c/ float(num_features) for c in FSI_counts]
-        record['num_features'] = num_features
-        record['feature_shape'] = fs
         record['thresholds'] = thresholds.tolist()
         record['fsi_fractions'] = FSI_fractions
         record['F_s_avg'] = F.mean(2).tolist()
@@ -86,9 +81,20 @@ class SimffaBandit(gb.GensonBandit):
             for stat in STATS:
                 stats[stat] = np.mean([r[1][stat] for r in results])
             record['training_data'][problem] = stats
+        
+        return record, FSI
+
+
+class SimffaBandit(gb.GensonBandit):
+
+    def __init__(self):
+        super(SimffaBandit, self).__init__(source_string=self.source_string)
+
+    @classmethod
+    def evaluate(cls, config, ctrl):
+        record, FSI = evalute_FSI(config)
         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
-
         return record
 
 
@@ -334,7 +340,7 @@ def compute_blobiness():
 
 import facelike
 
-def regression_traintest(dataset, features, regfunc, seed=0, ntrain=50, ntest=50, num_splits=5):
+def regression_traintest(dataset, features, regfunc, seed=0, ntrain=80, ntest=30, num_splits=5):
     Xr = np.array([m['filename'] for m in dataset.meta])
     labels = np.array([regfunc(m) for m in dataset.meta])
     splits = dataset.generate_splits(seed, ntrain, ntest, num_splits)
@@ -355,6 +361,68 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=50, ntest=50
     return results
 
 
+def evaluate_facelike(config, credentials, FSI=None):
+    dataset = facelike.Facelike(credentials)
+    X, labels = dataset.img_regression_task()
+    all_paths, labels1 = dataset.raw_regression_task()
+    assert (labels == labels1).all()
+    assert (all_paths == sorted(all_paths)).all()
+    features = get_features(X, config)
+    fs = features.shape
+    num_features = fs[1]*fs[2]*fs[3]
+    if FSI is not None:
+        FSI_shape = FSI.shape
+        assert FSI_shape == fs[1:]
+        FSI = np.ravel(FSI)
+
+    record = {}
+    record['num_features'] = num_features
+    record['feature_shape'] = fs
+    
+    subjects = [('subject_avg','avg')] # + [('subject_' + str(ind),ind) for ind in range(5)]
+    
+    bins = np.arange(-1, 1, .01)
+    record['bins'] = bins.tolist()
+    for subject, judgement in subjects:
+        record[subject] = {}
+        for name, subset in dataset.SUBSETS + [('all',None)]:
+            subpaths, sublabels = dataset.raw_regression_task(subset=subset,
+                                                        judgement=judgement)
+            inds = all_paths.searchsorted(subpaths)
+            f_subset = features[inds]
+            label_subset = labels[inds]
+            P, P_prob = pearsonr(f_subset, label_subset)
+            S, S_prob = spearmanr(f_subset, label_subset)
+            data = {}
+            data['Pearson_hist'] = np.histogram(P, bins)[0].tolist()
+            data['Pearson_avg'] = P.mean()
+            data['Spearman_hist'] = np.histogram(S, bins)[0].tolist()
+            data['Spearman_avg'] = S.mean()
+            data['Pearson_s_avg'] = P.mean(2).tolist()
+            data['Spearman_s_avg'] = S.mean(2).tolist()
+            if FSI is not None:
+                assert FSI_shape == P.shape == S.shape
+                P = np.ravel(P)
+                S = np.ravel(S)
+                data['Pearson_FSI_corr'] = np.corrcoef(FSI, P)
+                data['Spearman_FSI_corr'] = np.corrcoef(FSI, S)
+                sel_inds = (FSI > 1./3)
+                data['Pearson_hist_sel'] = np.histogram(P[sel_inds], bins)[0].tolist()
+                data['Pearson_avg_sel'] = P[sel_inds].mean()
+                data['Pearson_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], P[sel_inds])
+                data['Spearman_hist_sel'] = np.histogram(S[sel_inds], bins)[0].tolist()
+                data['Spearman_avg_sel'] = S[sel_inds].mean()
+                data['Spearman_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], S[sel_inds])
+                
+            record[subject][name] = data
+        
+        #r_cp = copy.deepcopy(record[subject])
+        #r_cp.pop('all')
+        #record[subject]['subset_avg'] = dict_avg(r_cp)
+
+    return record
+    
+    
 class SimffaFacelikeBandit(gb.GensonBandit):
     """
     call with bandit-argfile supplying credentials
@@ -364,47 +432,11 @@ class SimffaFacelikeBandit(gb.GensonBandit):
         self.credentials = tuple(credentials)
 
     def evaluate(self, config, ctrl):
-
-        dataset = facelike.Facelike(self.credentials)
-        X, y = dataset.img_regression_task()
-        features = get_features(X, config)
-        fs = features.shape
-        num_features = fs[1]*fs[2]*fs[3]
-
         record = {}
-        thresholds = np.arange(0,1,.01)
-        F = features[:20].mean(0)
-        BO = features[20:].mean(0)
-        FSI = (F - BO) / (np.abs(F) + np.abs(BO))
-        FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
-        FSI_fractions = [c/ float(num_features) for c in FSI_counts]
-        record['num_features'] = num_features
-        record['feature_shape'] = fs
-        record['thresholds'] = thresholds.tolist()
-        record['fsi_fractions'] = FSI_fractions
-        record['F_s_avg'] = F.mean(2).tolist()
-        record['BO_s_avg'] = BO.mean(2).tolist()
-        record['FSI_s_avg'] = FSI.mean(2).tolist()
-        record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
-
-        features = features.reshape((fs[0],num_features))
-        STATS = ['train_error','test_error']
-        reglabels = ['avg'] + ['subject_' + str(ind) for ind in range(5)]
-      
-        record['training_data'] = {}
-
-        for problem in reglabels:
-            if problem == 'avg':
-                func = lambda x: x['avg_rating']
-            else:
-                func = lambda x: x['ratings'][int(problem.split('_')[-1])]
-            results = regression_traintest(dataset, features, func)
-            stats = {}
-            for stat in STATS:
-                stats[stat] = np.mean([r[1][stat] for r in results])
-            record['training_data'][problem] = stats
-
-        record['loss'] = record['training_data']['avg']['test_error']
+        FSI_rec, FSI = evaluate_FSI(config)
+        record['FSI'] = FSI_rec
+        record['Facelike'] = evaluate_facelike(config, self.credentials, FSI=FSI)
+        record['loss'] = .5 * (1 - record['Facelike']['subject_avg']['all']['Pearson_avg'])
         print('DONE')
 
         return record
@@ -438,4 +470,11 @@ class SimffaFacelikeL3GaborBandit(SimffaFacelikeBandit):
     source_string = gh.string(simffa_params.l1_params_gabor)
 
 
+def dict_avg(d):
+    e = {}
+    K = d.keys()
+    KK = d[K].keys()
+    for kk in KK:
+        e[k] = float(np.mean([d[k][kk] for k in K]))
+    return e
 
