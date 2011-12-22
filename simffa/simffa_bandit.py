@@ -44,11 +44,33 @@ def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catf
         results.append(result)
     return results
 
+def evaluate_just_FSI(config):
+        dataset = skdata.fbo.FaceBodyObject20110803()
+        X, y = dataset.img_classification_task()
+        features = get_features(X, config, verbose=True)
+        fs = features.shape
+        num_features = fs[1]*fs[2]*fs[3]
+
+        record = {}
+        record['num_features'] = num_features
+        record['feature_shape'] = fs
+
+        thresholds = np.arange(0,1,.01)
+        F = features[:20].mean(0)
+        BO = features[20:].mean(0)
+        FSI = (F - BO) / (np.abs(F) + np.abs(BO))
+        FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
+        FSI_fractions = [c/ float(num_features) for c in FSI_counts]
+        record['thresholds'] = thresholds.tolist()
+        record['fsi_fractions'] = FSI_fractions
+        record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
+        return record, FSI
+
 
 def evaluate_FSI(config):
         dataset = skdata.fbo.FaceBodyObject20110803()
         X, y = dataset.img_classification_task()
-        features = get_features(X, config)
+        features = get_features(X, config, verbose=True)
         fs = features.shape
         num_features = fs[1]*fs[2]*fs[3]
 
@@ -367,7 +389,7 @@ def evaluate_facelike(config, credentials, FSI=None):
     all_paths, labels1 = dataset.raw_regression_task()
     assert (labels == labels1).all()
     assert (all_paths == sorted(all_paths)).all()
-    features = get_features(X, config)
+    features = get_features(X, config, verbose=True)
     fs = features.shape
     num_features = fs[1]*fs[2]*fs[3]
     if FSI is not None:
@@ -386,39 +408,40 @@ def evaluate_facelike(config, credentials, FSI=None):
     for subject, judgement in subjects:
         record[subject] = {}
         for name, subset in dataset.SUBSETS + [('all',None)]:
+            print('Evaluating', subject, name)
             subpaths, sublabels = dataset.raw_regression_task(subset=subset,
                                                         judgement=judgement)
             inds = all_paths.searchsorted(subpaths)
             f_subset = features[inds]
             label_subset = labels[inds]
             P, P_prob = pearsonr(f_subset, label_subset)
-            S, S_prob = spearmanr(f_subset, label_subset)
+            #S, S_prob = spearmanr(f_subset, label_subset)
             P = np.ma.masked_array(P,np.isnan(P))
-            S = np.ma.masked_array(S,np.isnan(S))
+            #S = np.ma.masked_array(S,np.isnan(S))
 
             data = {}
             data['Pearson_hist'] = np.histogram(P, bins)[0].tolist()
-            data['Pearson_avg'] = P.mean()
-            data['Spearman_hist'] = np.histogram(S, bins)[0].tolist()
-            data['Spearman_avg'] = S.mean()
+            data['Pearson_avg'] = float(P.mean())
+            #data['Spearman_hist'] = np.histogram(S, bins)[0].tolist()
+            #data['Spearman_avg'] = float(S.mean())
             data['Pearson_s_avg'] = P.mean(2).tolist()
-            data['Spearman_s_avg'] = S.mean(2).tolist()
+            #data['Spearman_s_avg'] = S.mean(2).tolist()
             if FSI is not None:
-                assert FSI_shape == P.shape == S.shape
+                assert FSI_shape == P.shape 
                 P = P.ravel()
                 sel_inds = np.invert(np.isnan(P))
-                data['Pearson_FSI_corr'] = np.corrcoef(FSI[sel_inds], P[sel_inds])
-                S = S.ravel()
-                sel_inds = np.invert(np.isnan(S))
-                data['Spearman_FSI_corr'] = np.corrcoef(FSI[sel_inds], S[sel_inds])
+                data['Pearson_FSI_corr'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
+                #S = S.ravel()
+                #sel_inds = np.invert(np.isnan(S))
+                #data['Spearman_FSI_corr'] = np.corrcoef(FSI[sel_inds], S[sel_inds]).tolist()
                 sel_inds = (FSI > 1./3) & np.invert(np.isnan(P))
                 data['Pearson_hist_sel'] = np.histogram(P[sel_inds], bins)[0].tolist()
-                data['Pearson_avg_sel'] = P[sel_inds].mean()
-                data['Pearson_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], P[sel_inds])
-                sel_inds = (FSI > 1./3)& np.invert(np.isnan(S))
-                data['Spearman_hist_sel'] = np.histogram(S[sel_inds], bins)[0].tolist()
-                data['Spearman_avg_sel'] = S[sel_inds].mean()
-                data['Spearman_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], S[sel_inds])
+                data['Pearson_avg_sel'] = float(P[sel_inds].mean())
+                data['Pearson_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
+                #sel_inds = (FSI > 1./3)& np.invert(np.isnan(S))
+                #data['Spearman_hist_sel'] = np.histogram(S[sel_inds], bins)[0].tolist()
+                #data['Spearman_avg_sel'] = float(S[sel_inds].mean())
+                #data['Spearman_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], S[sel_inds]).tolist()
 
             record[subject][name] = data
 
@@ -439,7 +462,7 @@ class SimffaFacelikeBandit(gb.GensonBandit):
 
     def evaluate(self, config, ctrl):
         record = {}
-        FSI_rec, FSI = evaluate_FSI(config)
+        FSI_rec, FSI = evaluate_just_FSI(config)
         record['FSI'] = FSI_rec
         record['Facelike'] = evaluate_facelike(config, self.credentials, FSI=FSI)
         record['loss'] = .5 * (1 - record['Facelike']['subject_avg']['all']['Pearson_avg'])
