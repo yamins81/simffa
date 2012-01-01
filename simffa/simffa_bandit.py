@@ -13,6 +13,7 @@ from thoreano.classifier import train_scikits
 
 import simffa_params
 from stats import pearsonr, spearmanr
+import scipy.stats as sp_stats
 
 def get_features(X, config, verbose=False):
     batchsize = 4
@@ -358,6 +359,83 @@ def compute_blobiness():
 
 
 
+import pymongo 
+import tabular as tb
+import scipy.signal as signal
+
+def Var(x):
+    #return np.abs(x - x.mean()).mean()
+    return x.var()
+    
+def compute_clusteriness():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+
+    ekeys = [('L1', 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L2', 'simffa.simffa_bandit.SimffaL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    ('L3', 'simffa.simffa_bandit.SimffaL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    #('L1g', 'simffa.simffa_bandit.SimffaL1GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial'),
+    #('L2g', 'simffa.simffa_bandit.SimffaL2GaborBandit/hyperopt.theano_bandit_algos.TheanoRandom/spatial')
+    ]
+
+    Frac = 10.
+    arrs = []
+    for (label,k) in ekeys:
+        print('doing', label)
+        C  = Jobs.find({'exp_key':k,'state':2})
+        recs = []
+        for (ind,c) in enumerate(C):
+            print(label, ind)
+            nf = c['result']['num_features']
+            A = np.array(c['result']['Face_selective_s_avg'])
+            av = Var(A)
+            if av > 0:
+                am = A.mean()
+                amax = A.max()
+                nl = nf/(A.shape[0]*A.shape[1])
+                sh = (s0,s1) =  (A.shape[0]/Frac, A.shape[1]/Frac)
+                Ac = signal.convolve2d(A,np.ones(sh),mode='same') / (s0*s1)
+                Ac = Ac[s0/2+1:-(s0/2+1),s1/2+1:-(s1/2+1)]
+                acv = Var(Ac)
+                arat = av/acv
+                r = (np.random.random((nf,)) < c['result']['fsi_fractions'][33]).astype(np.int).reshape(A.shape + (nl,)).mean(2)
+                rv = Var(r)
+                rm = r.mean()
+                rmax = r.max()
+                rc = signal.convolve2d(r,np.ones(sh),mode='same') / (s0*s1)
+                rc = rc[s0/2+1:-(s0/2+1),s1/2+1:-(s1/2+1)]
+                rcv = Var(rc)
+                rrat = rv/rcv
+                arrat = arat/rrat
+                recs.append((ind,A.shape[0], A.shape[1], av,am,amax,acv,arat,rv,rm,rmax,rcv,rrat,arrat))
+                
+        X = tb.tabarray(records=recs, names=['ind','s0','s1','av','am','amax','acv','arat','rv','rm','rmax','rcv','rrat','arrat'])
+        arrs.append(X) 
+            
+    return arrs
+
+
+def plot_clusteriness(arrs):
+    import matplotlib.pyplot as plt
+    plt.figure()
+    
+    B = plt.boxplot([(1/a['rrat']) for a in arrs])
+    B1 = plt.boxplot([(1/a['arat']) for a in arrs])
+    for b in B['boxes']:
+        b.set_color('g')
+    plt.draw()
+    
+    plt.plot(range(1,4),[np.mean(1/a['arat']) for a in arrs],color='blue')
+    plt.scatter(range(1,4),[np.mean(1/a['arat']) for a in arrs],color='blue')
+    plt.plot(range(1,4),[np.mean(1/a['rrat']) for a in arrs],color='green')
+    plt.scatter(range(1,4),[np.mean(1/a['rrat']) for a in arrs],color='green')
+    
+    plt.title('Spatial clustering measure:\nActual (blue) vs random mean/var-matched (green)')
+    plt.xticks(range(1,4),('L1','L2','L3'))
+    plt.ylabel('Clustering measure')
+    plt.savefig('Clustering.png')
+
 ######facelike regression
 
 import facelike
@@ -415,39 +493,33 @@ def evaluate_facelike(config, credentials, FSI=None):
             f_subset = features[inds]
             label_subset = labels[inds]
             P, P_prob = pearsonr(f_subset, label_subset)
-            #S, S_prob = spearmanr(f_subset, label_subset)
-            P = np.ma.masked_array(P,np.isnan(P))
-            #S = np.ma.masked_array(S,np.isnan(S))
+            P = np.ma.masked_array(P, np.isnan(P))
+            
+            f_rshp = f_subset.reshape((fs[0],num_features))
+            P_pop, P_pop_prob = sp_stats.pearsonr(f_rshp.mean(1), label_subset)
+            S_pop, S_pop_prob = sp_stats.spearmanr(f_rshp.mean(1), label_subset)
 
             data = {}
             data['Pearson_hist'] = np.histogram(P, bins)[0].tolist()
             data['Pearson_avg'] = float(P.mean())
-            #data['Spearman_hist'] = np.histogram(S, bins)[0].tolist()
-            #data['Spearman_avg'] = float(S.mean())
             data['Pearson_s_avg'] = P.mean(2).tolist()
-            #data['Spearman_s_avg'] = S.mean(2).tolist()
+            data['Pearson_pop_avg'] = float(P_pop)
+            data['Spearman_pop_avg'] = float(S_pop)
+            
             if FSI is not None:
-                assert FSI_shape == P.shape 
+                assert FSI_shape == P.shape == f_subset.shape[1:]
+                sel_inds = (FSI > 1./3)
+                data['Pearson_pop_avg_sel'] = float(sp_stats.pearsonr(f_rshp[sel_inds].mean(1), label_subset))
+                data['Spearman_pop_avg_sel'] = float(sp_stats.spearmanr(f_rshp[sel_inds].mean(1), label_subset))
                 P = P.ravel()
                 sel_inds = np.invert(np.isnan(P))
                 data['Pearson_FSI_corr'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
-                #S = S.ravel()
-                #sel_inds = np.invert(np.isnan(S))
-                #data['Spearman_FSI_corr'] = np.corrcoef(FSI[sel_inds], S[sel_inds]).tolist()
                 sel_inds = (FSI > 1./3) & np.invert(np.isnan(P))
                 data['Pearson_hist_sel'] = np.histogram(P[sel_inds], bins)[0].tolist()
                 data['Pearson_avg_sel'] = float(P[sel_inds].mean())
                 data['Pearson_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
-                #sel_inds = (FSI > 1./3)& np.invert(np.isnan(S))
-                #data['Spearman_hist_sel'] = np.histogram(S[sel_inds], bins)[0].tolist()
-                #data['Spearman_avg_sel'] = float(S[sel_inds].mean())
-                #data['Spearman_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], S[sel_inds]).tolist()
-
+ 
             record[subject][name] = data
-
-        #r_cp = copy.deepcopy(record[subject])
-        #r_cp.pop('all')
-        #record[subject]['subset_avg'] = dict_avg(r_cp)
 
     return record
 
@@ -507,3 +579,133 @@ def dict_avg(d):
         e[k] = float(np.mean([d[k][kk] for k in K]))
     return e
 
+def correct(A):
+    for a in A:
+        for (ind,aa) in enumerate(a):
+            if aa is None:
+                a[ind] = 0
+            
+                            
+def make_facelike_spatial_plots():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+    import matplotlib.pyplot as plt
+    ekeys = [
+             ('L1', u'simffa.simffa_bandit.SimffaFacelikeL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L2', u'simffa.simffa_bandit.SimffaFacelikeL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L3', u'simffa.simffa_bandit.SimffaFacelikeL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]')
+            ]
+    
+    subsets = map(str,[u'all',  u'eye', u'nose', u'eye-mouth', u'eye-nose', u'eye-eye'])
+    fields = ['result.Facelike.subject_avg.' + subset + '.Pearson_s_avg' for subset in subsets]
+    
+    for label, e in ekeys:    
+        H = Jobs.find({'exp_key':e,'state':2}, fields=fields, timeout=False)
+        cnt = Jobs.find({'exp_key':e,'state':2}).count()
+        dir = os.path.join(label + '_pearson_s_average')
+        os.makedirs(dir)
+        plt.subplots_adjust(hspace=.5)
+        for (_i,h) in enumerate(H):
+            print('%s: %d of %d' % (label, _i, cnt))    
+            for (ind, subset) in enumerate(subsets):
+                p = plt.subplot(3, 2, ind+1)
+                v = h['result']['Facelike']['subject_avg'][subset]['Pearson_s_avg']
+                correct(v)
+                p.imshow(v)
+                p.set_title(subset)
+            plt.draw()
+            path = os.path.join(dir, str(_i) + '_spatial.png')
+            plt.savefig(path)
+            plt.clf()
+            
+
+def make_facelike_FSI_Corr():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+    import matplotlib.pyplot as plt
+    ekeys = [
+             ('L1', u'simffa.simffa_bandit.SimffaFacelikeL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L2', u'simffa.simffa_bandit.SimffaFacelikeL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L3', u'simffa.simffa_bandit.SimffaFacelikeL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]')
+            ]
+    
+    subsets = map(str,[u'all',  u'eye', u'nose', u'eye-mouth', u'eye-nose', u'eye-eye'])
+    fields = ['result.Facelike.subject_avg.' + subset + '.' + x for subset in subsets for x in ['Pearson_FSI_corr', 'Pearson_FSI_corr_sel']]
+    
+    res = []
+    res_sel = []
+    for label, e in ekeys:    
+        H = list(Jobs.find({'exp_key':e,'state':2}, fields=fields, timeout=False))
+        col = []
+        col_sel = []
+        for subset in subsets:
+            x = np.array([h['result']['Facelike']['subject_avg'][subset]['Pearson_FSI_corr'][0][1] for h in H])
+            x[np.isnan(x)] = 0
+            col.append(x.mean())
+            
+            y = np.array([h['result']['Facelike']['subject_avg'][subset]['Pearson_FSI_corr_sel'][0][1] for h in H])
+            y[np.isnan(y)] = 0
+            col_sel.append(y.mean())
+        res.append(col)
+        res_sel.append(col_sel)
+    
+    X = tb.tabarray(columns = [subsets] + res, names = ('subset',) + zip(*ekeys)[0])
+    X_sel = tb.tabarray(columns = [subsets] + res_sel, names = ('subset',) + zip(*ekeys)[0])
+    
+    import matplotlib.pyplot as plt
+    for x in X[['L1','L2','L3']].extract():
+        plt.plot(x)
+        plt.scatter(range(len(x)),x)
+    plt.xticks((0,1,2),('L1','L2','L3'))
+    plt.legend(tuple(X['subset']), loc='best')
+    plt.ylabel('Mean pearson-FSI Correlation over all models')
+    plt.savefig('pearson_FSI_correlation.png')
+            
+    return X, X_sel
+        
+                
+def make_facelike_hists():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+    import matplotlib.pyplot as plt
+    ekeys = [('L1', u'simffa.simffa_bandit.SimffaFacelikeL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L2', u'simffa.simffa_bandit.SimffaFacelikeL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L3', u'simffa.simffa_bandit.SimffaFacelikeL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]')]
+    
+    subsets = map(str,[u'all',  u'eye', u'nose', u'eye-mouth', u'eye-nose', u'eye-eye'])
+    fields = ['result.Facelike.bins'] + ['result.Facelike.subject_avg.' + subset + '.' + x for subset in subsets for x in ['Pearson_hist', 'Pearson_hist_sel']]
+    
+    for label, e in ekeys:    
+        H = Jobs.find({'exp_key':e,'state':2}, fields=fields, timeout=False)
+        cnt = Jobs.find({'exp_key':e,'state':2}).count()
+        dir = os.path.join(label + '_hists')
+        os.makedirs(dir)
+        plt.subplots_adjust(hspace=.5)
+        for (_i,h) in enumerate(H):
+            print('%s: %d of %d' % (label, _i, cnt))
+            bins = h['result']['Facelike']['bins']            
+            for (ind, subset) in enumerate(subsets):
+                p = plt.subplot(3, 2, ind+1)
+                v = np.array(h['result']['Facelike']['subject_avg'][subset]['Pearson_hist'])
+                if v.sum() > 0:
+                    v = v/float(v.sum())
+                p.bar(bins[:-1], v, width=bins[1]-bins[0])
+                p.set_title(subset)
+            plt.draw()
+            path = os.path.join(dir, str(_i) + '_hist.png')
+            plt.savefig(path)
+            plt.clf()
+            for (ind, subset) in enumerate(subsets):
+                p = plt.subplot(3, 2, ind+1)
+                v = np.array(h['result']['Facelike']['subject_avg'][subset]['Pearson_hist_sel'])
+                if v.sum() > 0:
+                    v = v/float(v.sum())
+                p.bar(bins[:-1], v, width=bins[1]-bins[0])
+                p.set_title(subset)
+            plt.draw()
+            path = os.path.join(dir, str(_i) + '_hist_sel.png')
+            plt.savefig(path)
+            plt.clf()
