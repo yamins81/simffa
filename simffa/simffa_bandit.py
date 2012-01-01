@@ -5,6 +5,8 @@ import copy
 
 import pymongo as pm
 import numpy as np
+import tabular as tb
+import scipy.signal as signal
 import skdata.fbo
 import hyperopt.genson_bandits as gb
 import hyperopt.genson_helpers as gh
@@ -358,11 +360,6 @@ def compute_blobiness():
     return things
 
 
-
-import pymongo 
-import tabular as tb
-import scipy.signal as signal
-
 def Var(x):
     #return np.abs(x - x.mean()).mean()
     return x.var()
@@ -664,6 +661,40 @@ def make_facelike_FSI_Corr():
     plt.savefig('pearson_FSI_correlation.png')
             
     return X, X_sel
+    
+def make_facelike_FSI_Corr_boxplots():
+    conn = pm.Connection()
+    db = conn['hyperopt']
+    Jobs = db['jobs']
+    import matplotlib.pyplot as plt
+    ekeys = [
+             ('L1', u'simffa.simffa_bandit.SimffaFacelikeL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L2', u'simffa.simffa_bandit.SimffaFacelikeL2Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]'),
+             ('L3', u'simffa.simffa_bandit.SimffaFacelikeL3Bandit/hyperopt.theano_bandit_algos.TheanoRandom[arghash:39db382c5f3ba8dd0c8af1864455e618]')
+            ]
+    
+    subsets = map(str,[u'all',  u'eye', u'nose', u'eye-mouth', u'eye-nose', u'eye-eye'])
+    fields = ['result.Facelike.subject_avg.' + subset + '.' + x for subset in subsets for x in ['Pearson_FSI_corr', 'Pearson_FSI_corr_sel']]
+    
+    rows = dict([(x,[]) for x in subsets])
+
+    for label, e in ekeys:    
+        H = list(Jobs.find({'exp_key':e,'state':2}, fields=fields, timeout=False))
+        for subset in subsets:
+            x = np.array([h['result']['Facelike']['subject_avg'][subset]['Pearson_FSI_corr'][0][1] for h in H])
+            x = x[np.invert(np.isnan(x))]
+            rows[subset].append(x)
+            
+    for subset in subsets:
+        plt.figure()
+        plt.boxplot(rows[subset])
+        plt.plot(range(1,4),[m.mean() for m in rows[subset]],color='g')
+        plt.scatter(range(1,4),[m.mean() for m in rows[subset]],color='g')
+        plt.xticks(range(1,4),('L1','L2','L3'))
+        plt.ylabel('Mean pearson-FSI Correlation over all models')
+        plt.savefig('pearson_FSI_correlation_' + subset + '_boxplot.png')
+            
+    return rows
         
                 
 def make_facelike_hists():
