@@ -684,15 +684,28 @@ def make_facelike_FSI_Corr_boxplots():
             x = np.array([h['result']['Facelike']['subject_avg'][subset]['Pearson_FSI_corr'][0][1] for h in H])
             x = x[np.invert(np.isnan(x))]
             rows[subset].append(x)
-            
-    for subset in subsets:
-        plt.figure()
-        plt.boxplot(rows[subset])
-        plt.plot(range(1,4),[m.mean() for m in rows[subset]],color='g')
-        plt.scatter(range(1,4),[m.mean() for m in rows[subset]],color='g')
-        plt.xticks(range(1,4),('L1','L2','L3'))
-        plt.ylabel('Mean pearson-FSI Correlation over all models')
-        plt.savefig('pearson_FSI_correlation_' + subset + '_boxplot.png')
+    
+    plt.figure(figsize=(15,15))
+    for (s_ind, subset) in enumerate(subsets):
+        p = plt.subplot(3,2,s_ind+1)
+        p.boxplot(rows[subset])
+        p.plot(range(1,4),[m.mean() for m in rows[subset]],color='g')
+        p.scatter(range(1,4),[m.mean() for m in rows[subset]],color='g')
+        p.set_xticks(range(1,4))
+        p.set_xticklabels(('L1','L2','L3'))
+
+        if p.colNum == 0:
+            p.set_ylabel('Facelike/FSI fit')
+        else:
+            p.yaxis.set_visible(False)
+        p.set_title(subset,x=.5,y=1)
+        
+        #p.set_ylabel('Mean pearson-FSI Correlation over all models')
+    
+    plt.subplots_adjust(wspace=.05, hspace=.15)
+    plt.suptitle('Facelike-FSI Correlation over all models', fontsize=20)
+    plt.draw()
+    plt.savefig('pearson_FSI_correlation_boxplots.png')
             
     return rows
         
