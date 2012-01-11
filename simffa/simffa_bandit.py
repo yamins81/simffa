@@ -71,58 +71,41 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=80, ntest=30
     return results
     
 
-def evaluate_just_FSI(config):
-        dataset = skdata.fbo.FaceBodyObject20110803()
-        X, y = dataset.img_classification_task()
-        features = get_features(X, config, verbose=True)
-        fs = features.shape
-        num_features = fs[1]*fs[2]*fs[3]
-
-        record = {}
-        record['num_features'] = num_features
-        record['feature_shape'] = fs
-
-        thresholds = np.arange(0,1,.01)
-        F = features[:20].mean(0)
-        BO = features[20:].mean(0)
-        FSI = (F - BO) / (np.abs(F) + np.abs(BO))
-        FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
-        FSI_fractions = [c/ float(num_features) for c in FSI_counts]
-        record['thresholds'] = thresholds.tolist()
-        record['fsi_fractions'] = FSI_fractions
-        record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
-        return record, FSI
+def evaluate_just_FSI(dataset, config):
+    record, FSI = evaluate_FSI(dataset, config, train=False)
+    for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
+        record.pop(k)       
+    return record, FSI
 
 
-def evaluate_FSI(config):
-        dataset = skdata.fbo.FaceBodyObject20110803()
-        X, y = dataset.img_classification_task()
-        features = get_features(X, config, verbose=True)
-        fs = features.shape
-        num_features = fs[1]*fs[2]*fs[3]
-
-        record = {}
-        record['num_features'] = num_features
-        record['feature_shape'] = fs
-
-        thresholds = np.arange(0,1,.01)
-        F = features[:20].mean(0)
-        BO = features[20:].mean(0)
-        FSI = (F - BO) / (np.abs(F) + np.abs(BO))
-        FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
-        FSI_fractions = [c/ float(num_features) for c in FSI_counts]
-        record['thresholds'] = thresholds.tolist()
-        record['fsi_fractions'] = FSI_fractions
-        record['F_s_avg'] = F.mean(2).tolist()
-        record['BO_s_avg'] = BO.mean(2).tolist()
-        record['FSI_s_avg'] = FSI.mean(2).tolist()
-        record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
-
+def evaluate_FSI(dataset, config, train=True):
+    X, y = dataset.img_classification_task()
+    features = get_features(X, config, verbose=True)
+    fs = features.shape
+    num_features = fs[1]*fs[2]*fs[3]
+    record = {}
+    record['num_features'] = num_features
+    record['feature_shape'] = fs
+    thresholds = np.arange(0,1,.01)
+    meta = dataset.meta
+    face_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] == 'Face']
+    bo_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] != 'Face']
+    F = features[face_inds].mean(0)
+    BO = features[bo_inds].mean(0)
+    FSI = (F - BO) / (np.abs(F) + np.abs(BO))
+    FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
+    FSI_fractions = [c/ float(num_features) for c in FSI_counts]
+    record['thresholds'] = thresholds.tolist()
+    record['fsi_fractions'] = FSI_fractions
+    record['F_s_avg'] = F.mean(2).tolist()
+    record['BO_s_avg'] = BO.mean(2).tolist()
+    record['FSI_s_avg'] = FSI.mean(2).tolist()
+    record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
+    if train:
         features = features.reshape((fs[0],num_features))
         STATS = ['train_accuracy','train_ap','train_auc','test_accuracy','test_ap','test_auc']
         catfuncs = [('Face_Nonface',lambda x : x['name'] if x['name'] == 'Face' else 'Nonface'),
                     ('Face_Body_Object',None)]
-
         record['training_data'] = {}
         for (problem, func) in catfuncs:
             results = traintest(dataset, features, catfunc=func)
@@ -130,8 +113,7 @@ def evaluate_FSI(config):
             for stat in STATS:
                 stats[stat] = np.mean([r[1][stat] for r in results])
             record['training_data'][problem] = stats
-
-        return record, FSI
+    return record, FSI
 
 
 class SimffaBandit(gb.GensonBandit):
@@ -141,7 +123,8 @@ class SimffaBandit(gb.GensonBandit):
 
     @classmethod
     def evaluate(cls, config, ctrl):
-        record, FSI = evalute_FSI(config)
+        dataset = skdata.fbo.FaceBodyObject20110803() 
+        record, FSI = evalute_FSI(dataset, config)
         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
         return record
@@ -248,7 +231,8 @@ class SimffaFacelikeBandit(gb.GensonBandit):
 
     def evaluate(self, config, ctrl):
         record = {}
-        FSI_rec, FSI = evaluate_just_FSI(config)
+        dataset = skdata.fbo.FaceBodyObject20110803()
+        FSI_rec, FSI = evaluate_just_FSI(dataset, config)
         record['FSI'] = FSI_rec
         record['Facelike'] = evaluate_facelike(config, self.credentials, FSI=FSI)
         record['loss'] = .5 * (1 - record['Facelike']['subject_avg']['all']['Pearson_avg'])
