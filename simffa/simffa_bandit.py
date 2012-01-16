@@ -15,6 +15,7 @@ import skdata.fbo
 
 import simffa_params
 import simffa_datasets
+import fbo_invariant
 from simffa_stats import pearsonr, spearmanr
 
 
@@ -156,6 +157,23 @@ class SimffaL3Bandit(SimffaBandit):
 
 class SimffaL3GaborBandit(SimffaBandit):
     source_string = gh.string(simffa_params.l1_params_gabor)
+
+
+class SimffaInvariantBandit(gb.GensonBandit):
+
+    def __init__(self):
+        super(SimffaBandit, self).__init__(source_string=self.source_string)
+
+    @classmethod
+    def evaluate(cls, config, ctrl):
+        dataset = skdata.fbo.FaceBodyObject20110803() 
+        original_record, FSI = evalute_FSI(dataset, config)
+        invariant_dataset = fbo_invariant.FaceBodyObject20110803Invariant() 
+        invariant_record, FSI = evalute_FSI(invariant_dataset, config)
+        record = {'original': original_record, 'invariant': invariant_record}
+        record['loss'] = 1 - (record['invariant']['training_data']['Face_Nonface']['test_accuracy'])/100.
+        print('DONE')
+        return record
 
 
 def evaluate_facelike(config, credentials, FSI=None):
