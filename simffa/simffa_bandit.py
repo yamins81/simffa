@@ -76,14 +76,14 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=80, ntest=30
     return results
     
 
-def evaluate_just_FSI(dataset, config, train=False):
-    record, FSI = evaluate_FSI(dataset, config, train=train)
+def evaluate_just_FSI(dataset, config, train=False, **training_data):
+    record, FSI = evaluate_FSI(dataset, config, train=train, **training_data)
     for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
         record.pop(k)       
     return record, FSI
 
 
-def evaluate_FSI(dataset, config, train=True):
+def evaluate_FSI(dataset, config, train=True, **training_data):
     X, y = dataset.img_classification_task()
     features = get_features(X, config, verbose=True)
     fs = features.shape
@@ -113,7 +113,7 @@ def evaluate_FSI(dataset, config, train=True):
                     ('Face_Body_Object',None)]
         record['training_data'] = {}
         for (problem, func) in catfuncs:
-            results = traintest(dataset, features, catfunc=func)
+            results = traintest(dataset, features, catfunc=func, **training_data)
             stats = {}
             for stat in STATS:
                 stats[stat] = np.mean([r[1][stat] for r in results])
@@ -173,22 +173,23 @@ class SimffaL3GaborBandit(SimffaBandit):
 #########################
 
 class SimffaInvariantBandit(gb.GensonBandit):
-
+    training_data = {}
+    
     def __init__(self):
         super(SimffaInvariantBandit, self).__init__(source_string=self.source_string)
 
     @classmethod
     def evaluate(cls, config, ctrl):
         dataset = skdata.fbo.FaceBodyObject20110803() 
-        original_record, FSI = evaluate_just_FSI(dataset, config, train=True)
+        original_record, FSI = evaluate_just_FSI(dataset, config, train=True, **cls.training_data)
         invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
-        invariant_record0, FSI = evaluate_just_FSI(invariant_dataset0, config, train=True)
+        invariant_record0, FSI = evaluate_just_FSI(invariant_dataset0, config, train=True, **cls.training_data)
         invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
-        invariant_record1, FSI = evaluate_just_FSI(invariant_dataset1, config, train=True)
+        invariant_record1, FSI = evaluate_just_FSI(invariant_dataset1, config, train=True, **cls.training_data)
         invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
-        invariant_record2, FSI = evaluate_just_FSI(invariant_dataset2, config, train=True)
+        invariant_record2, FSI = evaluate_just_FSI(invariant_dataset2, config, train=True, **cls.training_data)
         invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
-        invariant_record_flip, FSI = evaluate_just_FSI(invariant_dataset_flip, config, train=True)    
+        invariant_record_flip, FSI = evaluate_just_FSI(invariant_dataset_flip, config, train=True, **cls.training_data)    
         record = {'original': original_record, 
                   'invariant0': invariant_record0,
                   'invariant1': invariant_record1,
@@ -200,6 +201,7 @@ class SimffaInvariantBandit(gb.GensonBandit):
 
 
 class SimffaL1InvariantBandit(SimffaInvariantBandit):
+    training_data = {'num_splits': 3}
     source_string = gh.string(simffa_params.l1_params)
 
 
