@@ -182,7 +182,11 @@ class BaseFaceBodyObjectInvariant(object):
 
     def _get_meta(self):
         metapath = self.home('meta.pkl')
-        return cPickle.load(open(metapath))
+        meta = cPickle.load(open(metapath))
+        filenames = np.array([m['filename'] for m in meta])
+        fsort = filenames.argsort()
+        meta = [meta[s] for s in fsort]
+        return meta
 
     @property
     def splits(self):
