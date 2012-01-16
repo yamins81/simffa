@@ -25,6 +25,8 @@ import Image
 from skdata.data_home import get_data_home
 from skdata.utils import download, extract, int_labels
 from skdata.utils.image import ImgLoader
+import hyperopt.gdist as gd
+
 
 def get_modified_image(cimg, bimg, inv_data):
     cimg = cimg.copy()
@@ -57,14 +59,21 @@ def get_modified_image(cimg, bimg, inv_data):
     
     
 class BaseFaceBodyObjectInvariant(object):
+    URL = 'http://dicarlocox-datasets.s3.amazonaws.com/FaceBodyObjectInvariant_2011_08_03.tar.gz'
+    NUM_GENERATE_PER_ORIGINAL = 3
+    SHA1 = 'c688b13f1f9e6723c5a99b0ccf477cf2805b236f'
+    SUBDIR = 'FaceBodyObjectInvariant_2011_08_03'
+    IMDIR = 'Generated_Images'
 
-    def __init__(self, meta=None, seed=0, ntrain=10, ntest=10, num_splits=5, gseed=0):
+    def __init__(self, meta=None, seed=0, ntrain=10, ntest=10,
+                 num_splits=5, gseed=0, make_original=False):
 
         self.seed = seed
         self.ntrain = ntrain
         self.ntest = ntest
         self.num_splits = num_splits
         self.names = ['Face','Body','Object']
+        self.make_original = make_original
         
         self.genson_template = gd.gDist(self.genson_string)
         self.genson_template.seed(gseed)
@@ -113,7 +122,7 @@ class BaseFaceBodyObjectInvariant(object):
             #generate images and metadata pkl
             background_dir = os.path.join(self.home(self.SUBDIR),'pink_noise')
             cutout_dir =  os.path.join(self.home(self.SUBDIR),'cutouts')
-            cutout_files = filter(lambda x : x.startswith('im'), os.listdir(cutout_dir))
+            cutout_files = filter(lambda x: x.startswith('im'), os.listdir(cutout_dir))
             metadata = []
             for cf in cutout_files:
                 print os.path.join(cutout_dir,cf)
@@ -126,18 +135,19 @@ class BaseFaceBodyObjectInvariant(object):
                 #original image
                 
                 name = 'Face' if ind < 21 else 'Body' if ind < 41 else 'Object'
-                im = bimg.copy()
-                im.paste(cimg.copy(), None, mask)
-                
-                filename = os.path.join(imdir,'original_' + str(ind)) + '.png'
-                im.save(filename)
-                sha1 = hashlib.sha1(open(filename,'rb').read()).hexdigest()
-                meta = dict(name=name,
-                            sha1=sha1,
-                            original=1,
-                            id='original_' + str(ind),
-                            filename=filename)
-                metadata.append(meta)
+                if self.make_original:
+                    im = bimg.copy()
+                    im.paste(cimg.copy(), None, mask)
+                    
+                    filename = os.path.join(imdir,'original_' + str(ind)) + '.png'
+                    im.save(filename)
+                    sha1 = hashlib.sha1(open(filename,'rb').read()).hexdigest()
+                    meta = dict(name=name,
+                                sha1=sha1,
+                                original=1,
+                                id='original_' + str(ind),
+                                filename=filename)
+                    metadata.append(meta)
                  
                 for _ind in range(self.NUM_GENERATE_PER_ORIGINAL):
                     inv_data = self.genson_template.sample()
@@ -244,13 +254,38 @@ class BaseFaceBodyObjectInvariant(object):
         return imgs, labels
 
 
-import hyperopt.gdist as gd
+class FaceBodyObject20110803Invariant0(BaseFaceBodyObjectInvariant):
+    genson_string = """{"scale": uniform(0.9, 1),
+                        "xpos": uniform(-0.1, 0.1),
+                        "ypos": uniform(-0.1, 0.1),
+                        "rot": uniform(-0.1, 0.1),
+                        "flip_lr": 0,
+                        "flip_ud": 0}"""
 
-class FaceBodyObject20110803Invariant(BaseFaceBodyObjectInvariant):
-    URL = 'http://dicarlocox-datasets.s3.amazonaws.com/FaceBodyObjectInvariant_2011_08_03.tar.gz'
-    genson_string = '{"scale":uniform(0.5,1), "xpos":uniform(-0.5,0.5), "rot": uniform(0, 1), "ypos":uniform(-0.5,0.5), "flip_lr":choice([0,1]), "flip_ud":choice([0,1])}'
-    NUM_GENERATE_PER_ORIGINAL = 2
-    SHA1 = 'c688b13f1f9e6723c5a99b0ccf477cf2805b236f'
-    SUBDIR = 'FaceBodyObjectInvariant_2011_08_03'
-    IMDIR = 'FaceBodyObjectInvariant_2011_08_03_Images'
 
+class FaceBodyObject20110803Invariant1(BaseFaceBodyObjectInvariant):
+    genson_string = """{"scale": uniform(0.75, 1),
+                        "xpos": uniform(-0.25, 0.25),
+                        "ypos": uniform(-0.25, 0.25),
+                        "rot": uniform(-0.25, 0.25),
+                        "flip_lr": choice([0, 1]),
+                        "flip_ud": 0}"""
+
+
+class FaceBodyObject20110803Invariant2(BaseFaceBodyObjectInvariant):
+    genson_string = """{"scale": uniform(0.5, 1),
+                        "xpos": uniform(-0.5, 0.5),
+                        "ypos": uniform(-0.5, 0.5),
+                        "rot": uniform(-0.5, 0.5),
+                        "flip_lr": choice([0, 1]),
+                        "flip_ud": choice([0, 1])}"""
+                        
+
+class FaceBodyObject20110803InvariantFlip(BaseFaceBodyObjectInvariant):
+    genson_string = """{"scale": 1,
+                        "xpos": 0,
+                        "ypos": 0,
+                        "rot": 0,
+                        "flip_lr": choice([0, 1]),
+                        "flip_ud": choice([0, 1])}"""
+    

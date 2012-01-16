@@ -19,6 +19,10 @@ import fbo_invariant
 from simffa_stats import pearsonr, spearmanr
 
 
+####################
+########Common stuff
+####################
+
 def get_features(X, config, verbose=False):
     batchsize = 4
     slm = slm_from_config(config, X.shape, batchsize=batchsize)
@@ -72,8 +76,8 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=80, ntest=30
     return results
     
 
-def evaluate_just_FSI(dataset, config):
-    record, FSI = evaluate_FSI(dataset, config, train=False)
+def evaluate_just_FSI(dataset, config, train=False):
+    record, FSI = evaluate_FSI(dataset, config, train=train)
     for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
         record.pop(k)       
     return record, FSI
@@ -117,6 +121,10 @@ def evaluate_FSI(dataset, config, train=True):
     return record, FSI
 
 
+############################
+########Original FBO Bandits
+############################
+
 class SimffaBandit(gb.GensonBandit):
 
     def __init__(self):
@@ -125,7 +133,7 @@ class SimffaBandit(gb.GensonBandit):
     @classmethod
     def evaluate(cls, config, ctrl):
         dataset = skdata.fbo.FaceBodyObject20110803() 
-        record, FSI = evalute_FSI(dataset, config)
+        record, FSI = evaluate_FSI(dataset, config)
         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
         return record
@@ -159,22 +167,54 @@ class SimffaL3GaborBandit(SimffaBandit):
     source_string = gh.string(simffa_params.l1_params_gabor)
 
 
+
+#########################
+########Invariant bandits
+#########################
+
 class SimffaInvariantBandit(gb.GensonBandit):
 
     def __init__(self):
-        super(SimffaBandit, self).__init__(source_string=self.source_string)
+        super(SimffaInvariantBandit, self).__init__(source_string=self.source_string)
 
     @classmethod
     def evaluate(cls, config, ctrl):
         dataset = skdata.fbo.FaceBodyObject20110803() 
-        original_record, FSI = evalute_FSI(dataset, config)
-        invariant_dataset = fbo_invariant.FaceBodyObject20110803Invariant() 
-        invariant_record, FSI = evalute_FSI(invariant_dataset, config)
-        record = {'original': original_record, 'invariant': invariant_record}
-        record['loss'] = 1 - (record['invariant']['training_data']['Face_Nonface']['test_accuracy'])/100.
+        original_record, FSI = evaluate_just_FSI(dataset, config, train=True)
+        invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
+        invariant_record0, FSI = evaluate_just_FSI(invariant_dataset0, config, train=True)
+        invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
+        invariant_record1, FSI = evaluate_just_FSI(invariant_dataset1, config, train=True)
+        invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
+        invariant_record2, FSI = evaluate_just_FSI(invariant_dataset2, config, train=True)
+        invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
+        invariant_record_flip, FSI = evaluate_just_FSI(invariant_dataset_flip, config, train=True)    
+        record = {'original': original_record, 
+                  'invariant0': invariant_record0,
+                  'invariant1': invariant_record1,
+                  'invariant2': invariant_record2,
+                  'invariant_flip': invariant_record_flip}
+        record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
         return record
 
+
+class SimffaL1InvariantBandit(SimffaInvariantBandit):
+    source_string = gh.string(simffa_params.l1_params)
+
+
+class SimffaL2InvariantBandit(SimffaInvariantBandit):
+    source_string = gh.string(simffa_params.l2_params)
+
+
+class SimffaL3InvariantBandit(SimffaInvariantBandit):
+    source_string = gh.string(simffa_params.l3_params)
+
+
+
+########################
+########Facelike bandits
+########################
 
 def evaluate_facelike(config, credentials, FSI=None):
     dataset = simffa_datasets.Facelike(credentials)
@@ -250,7 +290,7 @@ class SimffaFacelikeBandit(gb.GensonBandit):
     def evaluate(self, config, ctrl):
         record = {}
         dataset = skdata.fbo.FaceBodyObject20110803()
-        FSI_rec, FSI = evaluate_just_FSI(dataset, config)
+        FSI_rec, FSI = evaluate_just_FSI(dataset, config, train=False)
         record['FSI'] = FSI_rec
         record['Facelike'] = evaluate_facelike(config, self.credentials, FSI=FSI)
         record['loss'] = .5 * (1 - record['Facelike']['subject_avg']['all']['Pearson_avg'])
