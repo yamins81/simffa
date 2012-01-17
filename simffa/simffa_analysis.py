@@ -465,4 +465,210 @@ def correct(A):
         for (ind,aa) in enumerate(a):
             if aa is None:
                 a[ind] = 0
+                
+                
+#########
+def make_invariant_fsi_averages(conn=None, host='localhost', port=27017):
+    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
+
+
+    if conn is None:
+        conn = pm.Connection(host, port)    
+    Jobs = conn['hyperopt']['jobs']
+    
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2']
+    fracs = {}
+    for lbl, e in exp_keys:
+        fracs[lbl] = {}
+        for d in datasets:
+            L = Jobs.find({'exp_key': e, 'state': 2}, fields=['result.' + d + '.fsi_fractions'])
+            fracs[lbl][d] = np.array([l['result'][d]['fsi_fractions'] for l in L])
             
+    import matplotlib.pyplot as plt
+    
+    plt.figure(figsize=(18,6))
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        p = plt.subplot(1,3, e_ind + 1)
+        for d in datasets:
+            p.plot(fracs[lbl][d].mean(0))
+        if p.colNum == 0:
+            plt.ylabel('fraction of units at this FSI value, model class avg')
+        else:
+            #p.yaxis.set_visible(False)
+            pass
+        plt.title(lbl)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    #plt.subplots_adjust(wspace=.05)
+    plt.figlegend(lines, datasets, 'upper right')
+    plt.suptitle('Model-class-averaged FSI Curves by model class', fontsize=20)
+    plt.savefig('invariant_fsi_by_model_class.png')
+    
+    plt.figure(figsize=(18,11))
+    for d_ind, d in enumerate(datasets):
+        p = plt.subplot(2,3, d_ind + 1)
+        for lbl, e in exp_keys:
+            p.plot(fracs[lbl][d].mean(0))
+        plt.title(d)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    
+    #plt.subplots_adjust(wspace=.05)
+    plt.figlegend(lines, zip(*exp_keys)[0], 'upper right')
+    plt.suptitle('Model-class-averaged FSI Curves by imageset', fontsize=20)
+    plt.savefig('invariant_fsi_by_image_class.png')
+
+    plt.figure(figsize=(20, 15))
+    _i = 0
+    for lbl, e in exp_keys:
+        for d in datasets:
+            p = plt.subplot(3, 5, _i + 1)
+            _i += 1
+            p.boxplot(fracs[lbl][d][:,::10])
+            p.plot(range(1,11), fracs[lbl][d].mean(0)[::10], color='g')
+            p.scatter(range(1,11), fracs[lbl][d].mean(0)[::10], color='g')
+            plt.xticks(range(1, 11), np.arange(0, 1.1, .1))
+            plt.yticks(np.arange(0,1.1,.1))
+            plt.axhline(y=.15, linestyle='-.')
+            plt.title(lbl + ' ' + d)
+            plt.ylim((0,1))
+            if p.colNum == 0:
+                plt.ylabel('Fraction of units')
+            if p.rowNum == 2:
+                plt.xlabel('FSI value')
+    
+    plt.suptitle('Fraction of units vs FSI value (every tenth)', fontsize=20)
+    plt.savefig('invariant_fsi_boxplots.png')
+    
+    plt.close('all')
+    return fracs
+    
+
+def rgetattr(d,k):
+    if len(k) > 1:
+        return rgetattr(d[k[0]],k[1:])
+    else:
+        return d[k[0]]
+  
+def get_clusteriness(nfk, fsk, fsik, Jobs, q, Frac=10):
+
+    recs = []
+    for (ind, l) in enumerate(Jobs.find(q, fields=[nfk, fsk, fsik])):
+        print ind
+        f_s = rgetattr(l,fsk.split('.'))
+        nf = rgetattr(l, nfk.split('.'))
+        fsi_fractions = rgetattr(l, fsik.split('.'))
+        A = np.array(f_s)
+        av = Var(A)
+        if av > 0:
+            am = A.mean()
+            amax = A.max()
+            nl = nf/(A.shape[0]*A.shape[1])
+            sh = (s0,s1) =  (A.shape[0]/Frac, A.shape[1]/Frac)
+            Ac = signal.convolve2d(A,np.ones(sh),mode='same') / (s0*s1)
+            Ac = Ac[s0/2+1:-(s0/2+1),s1/2+1:-(s1/2+1)]
+            acv = Var(Ac)
+            arat = av/acv
+            r = (np.random.random((nf,)) < fsi_fractions[33]).astype(np.int).reshape(A.shape + (nl,)).mean(2)
+            rv = Var(r)
+            rm = r.mean()
+            rmax = r.max()
+            rc = signal.convolve2d(r,np.ones(sh),mode='same') / (s0*s1)
+            rc = rc[s0/2+1:-(s0/2+1),s1/2+1:-(s1/2+1)]
+            rcv = Var(rc)
+            rrat = rv/rcv
+            arrat = arat/rrat
+            recs.append((ind,A.shape[0], A.shape[1], av,am,amax,acv,arat,rv,rm,rmax,rcv,rrat,arrat))
+    X = tb.tabarray(records=recs, names=['ind','s0','s1','av','am','amax','acv','arat','rv','rm','rmax','rcv','rrat','arrat'])
+    return X
+            
+def get_clusteriness_invariant(conn=None, host='localhost', port=27017):
+
+    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
+
+    if conn is None:
+        conn = pm.Connection(host, port)    
+    Jobs = conn['hyperopt']['jobs']
+    
+    datasets = ['original', 'invariant0', 'invariant1', 'invariant2', 'invariant_flip']
+    
+    arrs = {}
+    for (lbl, e) in exp_keys:
+        arrs[lbl] = {}
+        for d in datasets:
+            print lbl, d
+            q = {'exp_key': e, 'state':2}
+            nfk = 'result.' + d + '.num_features'
+            fsk = 'result.' + d + '.Face_selective_s_avg'
+            fsik = 'result.' + d + '.fsi_fractions'
+            arrs[lbl][d] = get_clusteriness(nfk, fsk, fsik, Jobs, q, Frac=10)
+            
+    return arrs
+            
+
+def plot_clusteriness_invariant(arrs):
+    import matplotlib.pyplot as plt
+    
+    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2', ]
+
+    
+    notnan = lambda _x : _x[np.invert(np.isnan(_x))]
+    
+    plt.figure(figsize=(16,12))
+    for d_ind, d in enumerate(datasets):
+        p = plt.subplot(2, 3, d_ind + 1)
+        B = p.boxplot([(1/arrs[lbl][d]['rrat']) for lbl, e in exp_keys])
+        B1 = p.boxplot([(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys])
+        for b in B['boxes']:
+            b.set_color('g')
+    
+        line1 = p.plot(range(1,4),[np.mean(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys],color='blue')
+        p.scatter(range(1,4),[np.mean(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys],color='blue')
+        D = [np.mean(1/arrs[lbl][d]['rrat']) for lbl, e in exp_keys]
+        line2 = p.plot(range(1,4),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for lbl, e in exp_keys],color='green')
+        p.scatter(range(1,4),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for  lbl, e in exp_keys],color='green')
+        
+        plt.title(d)
+        plt.ylim((0,1))
+        plt.xticks(range(1,4),('L1','L2','L3'))
+        
+    plt.figlegend([line1, line2], ['Model', 'Random'], 'center right')
+    plt.suptitle('Spatial clustering measure by imageset \nActual vs random mean-matched', fontsize=20)
+    plt.draw()   
+    plt.savefig('invariant_spatial_clustering_by_imageset.png')
+    
+    plt.figure(figsize=(20, 6))
+    for e_ind, (lbl,e) in enumerate(exp_keys):
+        p = plt.subplot(1, 3, e_ind + 1)
+        B = p.boxplot([(1/arrs[lbl][d]['rrat']) for d in datasets])
+        B1 = p.boxplot([(1/arrs[lbl][d]['arat']) for d in datasets])
+        for b in B['boxes']:
+            b.set_color('g')
+    
+        line1 = p.plot(range(1,6),[np.mean(1/arrs[lbl][d]['arat']) for d in datasets],color='blue')
+        p.scatter(range(1,6),[np.mean(1/arrs[lbl][d]['arat']) for d in datasets],color='blue')
+        line2 = p.plot(range(1, 6),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for d in datasets],color='green')
+        p.scatter(range(1,6),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for d in datasets],color='green')
+        
+        plt.title(lbl)
+        plt.ylim((0,1))
+        plt.xticks(range(1,6),datasets)
+            
+    plt.subplots_adjust(hspace=.4)    
+    plt.figlegend([line1, line2], ['Model', 'Random'], 'center right')
+    plt.suptitle('Spatial clustering measure by model class: Actual vs random mean-matched', fontsize=20, y=1)
+    plt.draw()
+    plt.savefig('invariant_spatial_clustering_by_model_class.png')
+    
+    plt.close('all')
