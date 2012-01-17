@@ -39,7 +39,7 @@ def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catf
     labelset = set(labels)
     splits = dataset.generate_splits(seed, ntrain, ntest, num_splits, labelset=labelset, catfunc=catfunc)
     results = []
-    for ind in range(5):
+    for ind in range(num_splits):
         train_split = np.array(splits['train_' + str(ind)])
         test_split = np.array(splits['test_' + str(ind)])
         train_inds = np.searchsorted(Xr,train_split)
