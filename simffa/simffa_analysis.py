@@ -672,3 +672,107 @@ def plot_clusteriness_invariant(arrs):
     plt.savefig('invariant_spatial_clustering_by_model_class.png')
     
     plt.close('all')
+ 
+ 
+def plot_performance_invariant(conn=None, host='localhost', port=27017):
+ 
+    
+    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2', ]
+
+    if conn is None:
+        conn = pm.Connection(host, port)    
+    Jobs = conn['hyperopt']['jobs']
+    
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2']
+
+    Res = {}
+    for lbl, e in exp_keys:
+        Res[lbl] = {}
+        for d in datasets:
+            print lbl, d
+            L = Jobs.find({'exp_key': e, 'state': 2}, fields=['result.' + d + '.training_data'])
+            Res[lbl][d] = np.rec.array([(l['result'][d]['training_data']['Face_Nonface']['test_accuracy'],
+                                         l['result'][d]['training_data']['Face_Body_Object']['test_accuracy']) for l in L], 
+                                       names = ['Face_Nonface','Face_Body_Object'])
+    
+    
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(22,6))
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        p = plt.subplot(1,3, e_ind + 1)
+        p.boxplot([Res[lbl][d]['Face_Nonface'] for d in datasets])
+        p.plot(range(1,6), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets], color='g')
+        p.scatter(range(1,6), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets], color='g')
+        if p.colNum == 0:
+            plt.ylabel('Performance Model class avg')
+        else:
+            #p.yaxis.set_visible(False)
+            pass
+        plt.title(lbl)
+        plt.xticks(range(1,6), datasets)
+        plt.ylim((40,100))
+    plt.suptitle('Face/Nonface Performance vs imageset by model class', fontsize=20)
+    plt.savefig('invariant_performance_face_nonface_boxplot.png')
+     
+    plt.figure()
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        plt.plot(range(5), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets])
+        plt.scatter(range(5), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets])
+        plt.xticks(range(5), datasets)
+    plt.legend(('L1','L2','L3'))
+    plt.title('Face/Nonface Mean Performance')
+    plt.savefig('invariant_performance_face_nonface_mean.png')
+    
+    
+    plt.figure()
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        plt.plot(range(5), [Res[lbl][d]['Face_Nonface'].max() for d in datasets])
+        plt.scatter(range(5), [Res[lbl][d]['Face_Nonface'].max() for d in datasets])
+        plt.xticks(range(5), datasets)
+    plt.legend(('L1','L2','L3'))
+    plt.title('Face/Nonface max Performance')
+    plt.savefig('invariant_performance_face_nonface_max.png')
+
+    plt.figure(figsize=(22,6))
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        p = plt.subplot(1,3, e_ind + 1)
+        p.boxplot([Res[lbl][d]['Face_Body_Object'] for d in datasets])
+        p.plot(range(1,6), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets], color='g')
+        p.scatter(range(1,6), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets], color='g')
+        if p.colNum == 0:
+            plt.ylabel('Performance Model class avg')
+        else:
+            #p.yaxis.set_visible(False)
+            pass
+        plt.title(lbl)
+        plt.xticks(range(1,6), datasets)
+        plt.ylim((40,100))
+    plt.suptitle('Face/Body/Object Performance vs imageset by model class', fontsize=20)
+    plt.savefig('invariant_performance_face_body_object_boxplot.png')
+     
+    plt.figure()
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        plt.plot(range(5), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets])
+        plt.scatter(range(5), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets])
+        plt.xticks(range(5), datasets)
+    plt.legend(('L1','L2','L3'))
+    plt.title('Face/Body/Object Mean Performance')
+    plt.savefig('invariant_performance_face_body_object_mean.png')
+    
+    
+    plt.figure()
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        plt.plot(range(5), [Res[lbl][d]['Face_Body_Object'].max() for d in datasets])
+        plt.scatter(range(5), [Res[lbl][d]['Face_Body_Object'].max() for d in datasets])
+        plt.xticks(range(5), datasets)
+    plt.legend(('L1','L2','L3'))
+    plt.title('Face/Body/Object max Performance')
+    plt.savefig('invariant_performance_face_body_object_max.png')
+
+    
+    plt.close('all')
+    
+    return Res
