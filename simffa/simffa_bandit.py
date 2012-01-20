@@ -213,6 +213,14 @@ class SimffaL3InvariantBandit(SimffaInvariantBandit):
     source_string = gh.string(simffa_params.l3_params)
 
 
+class SimffaPixelsInvariantBandit(SimffaInvariantBandit):
+    source_string = gh.string(simffa_params.pixels_params)
+
+
+class SimffaV1LikeInvariantBandit(SimffaInvariantBandit):
+    training_data = {'num_splits': 3}
+    source_string = gh.string(simffa_params.v1like_params)
+    
 
 ########################
 ########Facelike bandits

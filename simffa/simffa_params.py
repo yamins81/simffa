@@ -134,4 +134,42 @@ l3_params_gabor_larger = {'desc' : layers_gabor_larger}
 
 
 
+######v1
+
+v1like_lpool = {'kwargs': {'ker_shape' : choice([(13,13),(17,17),(19,19),(21,21)]),
+          'order' : choice([1, 2, 10])
+         }}
+
+v1like_filter = dict(
+         initialize=dict(
+            filter_shape=choice([(33,33),(43,43),(53,53)]),
+            n_filters=choice([16,64,96]),
+            generate=(
+                'random:gabor',
+                {'min_wl': 2, 'max_wl': 20 ,
+                 'rseed': choice(range(5))})),
+         kwargs={})
+
+v1like_rescale = {'kwargs': {'stride' : choice([3, 4, 5])}}
+
+v1like_params = {'desc': [
+            [('lnorm', lnorm),
+             ('fbcorr', v1like_filter),
+             ('lnorm', lnorm),
+             ('activ', activ),
+             ('lpool', v1like_lpool),
+             ('rescale', v1like_rescale)],
+           ]}
+
+
+######pixels
+pixels_lpool = {'kwargs': {'ker_shape' : choice([(1,1),(5,5)]),
+                           'order' : 1}
+               }
+pixels_rescale = {'kwargs': {'stride' : choice([1, 3])}}
+
+pixels_params = {'desc': [
+                [('lpool', pixels_lpool),
+                 ('rescale', pixels_rescale)],
+             ]}
 
