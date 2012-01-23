@@ -12,11 +12,11 @@ import hyperopt.genson_helpers as gh
 from thoreano.slm import slm_from_config, FeatureExtractor
 from thoreano.classifier import train_scikits
 import skdata.fbo
+from yamutils.stats import pearsonr, spearmanr
 
 import simffa_params
 import simffa_datasets
 import fbo_invariant
-from simffa_stats import pearsonr, spearmanr
 
 
 ####################
