@@ -197,13 +197,11 @@ class SimffaInvariantBandit(gb.GensonBandit):
                   'invariant2': invariant_record2,
                   'invariant_flip': invariant_record_flip}
         if hasattr(ctrl, 'set_attachment'):
-            spatial_averages = {}
             for k in record:
-                spatial_averages[k] = {}
                 for l in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg', 'Face_selective_s_avg']:
-                    spatial_averages[k][l] = record[k].pop(l)
-            blob = cPickle.dumps(spatial_averages)
-            ctrl.set_attachment(blob, 'spatial_averages')
+                    spatial_averages = record[k].pop(l)
+                    blob = cPickle.dumps(spatial_averages)
+                    ctrl.set_attachment(blob, 'spatial_averages_' + k + '_' + l)
         record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
         return record
