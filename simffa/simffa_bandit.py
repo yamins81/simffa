@@ -2,6 +2,7 @@
 # MUST be run with feature/separate_activation branch of thoreano
 """
 import copy
+import cPickle
 
 import pymongo as pm
 import numpy as np
@@ -79,7 +80,7 @@ def regression_traintest(dataset, features, regfunc, seed=0, ntrain=80, ntest=30
 def evaluate_just_FSI(dataset, config, train=False, **training_data):
     record, FSI = evaluate_FSI(dataset, config, train=train, **training_data)
     for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
-        record.pop(k)       
+        spatial_averages[k] = record.pop(k)       
     return record, FSI
 
 
@@ -181,20 +182,28 @@ class SimffaInvariantBandit(gb.GensonBandit):
     @classmethod
     def evaluate(cls, config, ctrl):
         dataset = skdata.fbo.FaceBodyObject20110803() 
-        original_record, FSI = evaluate_just_FSI(dataset, config, train=True, **cls.training_data)
+        original_record, FSI = evaluate_FSI(dataset, config, train=True, **cls.training_data)
         invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
-        invariant_record0, FSI = evaluate_just_FSI(invariant_dataset0, config, train=True, **cls.training_data)
+        invariant_record0, FSI = evaluate_FSI(invariant_dataset0, config, train=True, **cls.training_data)
         invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
-        invariant_record1, FSI = evaluate_just_FSI(invariant_dataset1, config, train=True, **cls.training_data)
+        invariant_record1, FSI = evaluate_FSI(invariant_dataset1, config, train=True, **cls.training_data)
         invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
-        invariant_record2, FSI = evaluate_just_FSI(invariant_dataset2, config, train=True, **cls.training_data)
+        invariant_record2, FSI = evaluate_FSI(invariant_dataset2, config, train=True, **cls.training_data)
         invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
-        invariant_record_flip, FSI = evaluate_just_FSI(invariant_dataset_flip, config, train=True, **cls.training_data)    
+        invariant_record_flip, FSI = evaluate_FSI(invariant_dataset_flip, config, train=True, **cls.training_data)            
         record = {'original': original_record, 
                   'invariant0': invariant_record0,
                   'invariant1': invariant_record1,
                   'invariant2': invariant_record2,
                   'invariant_flip': invariant_record_flip}
+        if hasattr(ctrl, 'set_attachment'):
+            spatial_averages = {}
+            for k in record:
+                spatial_averages[k] = {}
+                for l in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg', 'Face_selective_s_avg']:
+                    spatial_averages[k][l] = record[k].pop(l)
+            blob = cPickle.dumps(spatial_averages)
+            ctrl.set_attachment(blob, 'spatial_averages')
         record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
         print('DONE')
         return record
