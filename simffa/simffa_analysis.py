@@ -1,10 +1,12 @@
 import os
+import cPickle
 
 import pymongo as pm
 import numpy as np
 import tabular as tb
 import scipy.signal as signal
 
+from hyperopt.mongoexp import MongoJobs, as_mongo_str
 
 def make_plots():
     conn = pm.Connection()
@@ -469,7 +471,9 @@ def correct(A):
                 
 #########
 def make_invariant_fsi_averages(conn=None, host='localhost', port=27017):
-    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+    exp_keys = [('Pixels',  u'simffa.simffa_bandit.SimffaPixelsInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('V1Like', u'simffa.simffa_bandit.SimffaV1LikeInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
 
@@ -488,9 +492,10 @@ def make_invariant_fsi_averages(conn=None, host='localhost', port=27017):
             
     import matplotlib.pyplot as plt
     
-    plt.figure(figsize=(18,6))
+    plt.figure(figsize=(16,10))
     for e_ind, (lbl, e) in enumerate(exp_keys):
-        p = plt.subplot(1,3, e_ind + 1)
+        #p = plt.subplot(1, 3, e_ind + 1)
+        p = plt.subplot(3, 2, e_ind + 1)
         for d in datasets:
             p.plot(fracs[lbl][d].mean(0))
         if p.colNum == 0:
@@ -528,7 +533,8 @@ def make_invariant_fsi_averages(conn=None, host='localhost', port=27017):
     _i = 0
     for lbl, e in exp_keys:
         for d in datasets:
-            p = plt.subplot(3, 5, _i + 1)
+            #p = plt.subplot(3, 5, _i + 1)
+            p = plt.subplot(5, 5, _i + 1)
             _i += 1
             p.boxplot(fracs[lbl][d][:,::10])
             p.plot(range(1,11), fracs[lbl][d].mean(0)[::10], color='g')
@@ -544,6 +550,7 @@ def make_invariant_fsi_averages(conn=None, host='localhost', port=27017):
                 plt.xlabel('FSI value')
     
     plt.suptitle('Fraction of units vs FSI value (every tenth)', fontsize=20)
+    plt.subplots_adjust(hspace=.25)
     plt.savefig('invariant_fsi_boxplots.png')
     
     plt.close('all')
@@ -556,12 +563,18 @@ def rgetattr(d,k):
     else:
         return d[k[0]]
   
-def get_clusteriness(nfk, fsk, fsik, Jobs, q, Frac=10):
+def get_clusteriness(nfk, fsk, fsik, mj, q, Frac=10):
+    Jobs = mj.coll
 
     recs = []
-    for (ind, l) in enumerate(Jobs.find(q, fields=[nfk, fsk, fsik])):
+    for (ind, l) in enumerate(Jobs.find(q, fields=[nfk, fsk, fsik, '_attachments'])):
         print ind
-        f_s = rgetattr(l,fsk.split('.'))
+        try:
+            f_s = rgetattr(l,fsk.split('.'))
+        except:
+            d = fsk.split('.')[1]
+            blob = mj.get_attachment(l, 'spatial_averages_' + d + '_Face_selective_s_avg')
+            f_s = cPickle.loads(blob)
         nf = rgetattr(l, nfk.split('.'))
         fsi_fractions = rgetattr(l, fsik.split('.'))
         A = np.array(f_s)
@@ -585,18 +598,23 @@ def get_clusteriness(nfk, fsk, fsik, Jobs, q, Frac=10):
             rrat = rv/rcv
             arrat = arat/rrat
             recs.append((ind,A.shape[0], A.shape[1], av,am,amax,acv,arat,rv,rm,rmax,rcv,rrat,arrat))
-    X = tb.tabarray(records=recs, names=['ind','s0','s1','av','am','amax','acv','arat','rv','rm','rmax','rcv','rrat','arrat'])
-    return X
-            
-def get_clusteriness_invariant(conn=None, host='localhost', port=27017):
 
-    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+    if len(recs) > 0:
+        X = tb.tabarray(records=recs, names=['ind','s0','s1','av','am','amax','acv','arat','rv','rm','rmax','rcv','rrat','arrat'])
+        return X
+    
+            
+def get_clusteriness_invariant(mj = None, host='localhost', port=27017):
+
+    exp_keys =  [('Pixels',  u'simffa.simffa_bandit.SimffaPixelsInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('V1Like', u'simffa.simffa_bandit.SimffaV1LikeInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
-
-    if conn is None:
-        conn = pm.Connection(host, port)    
-    Jobs = conn['hyperopt']['jobs']
+   
+    if mj is None:
+        options = host + ':' + str(port) + '/hyperopt' 
+        mj = MongoJobs.new_from_connection_str(as_mongo_str(options) + '/jobs')
     
     datasets = ['original', 'invariant0', 'invariant1', 'invariant2', 'invariant_flip']
     
@@ -609,21 +627,30 @@ def get_clusteriness_invariant(conn=None, host='localhost', port=27017):
             nfk = 'result.' + d + '.num_features'
             fsk = 'result.' + d + '.Face_selective_s_avg'
             fsik = 'result.' + d + '.fsi_fractions'
-            arrs[lbl][d] = get_clusteriness(nfk, fsk, fsik, Jobs, q, Frac=10)
+            arrs[lbl][d] = get_clusteriness(nfk, fsk, fsik, mj, q, Frac=10)
             
     return arrs
             
-
+import copy
 def plot_clusteriness_invariant(arrs):
     import matplotlib.pyplot as plt
     
-    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+    exp_keys =  [('Pixels',  u'simffa.simffa_bandit.SimffaPixelsInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('V1Like', u'simffa.simffa_bandit.SimffaV1LikeInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
+    labels = zip(*exp_keys)[0]
     datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2', ]
 
     
     notnan = lambda _x : _x[np.invert(np.isnan(_x))]
+    
+    arrs = copy.deepcopy(arrs)
+    for (lbl, e) in exp_keys:
+        for d in datasets:
+            if arrs[lbl][d] is None:
+                arrs[lbl][d] = {'rrat': np.array([np.inf]), 'arat': np.array([np.inf])}
     
     plt.figure(figsize=(16,12))
     for d_ind, d in enumerate(datasets):
@@ -633,24 +660,25 @@ def plot_clusteriness_invariant(arrs):
         for b in B['boxes']:
             b.set_color('g')
     
-        line1 = p.plot(range(1,4),[np.mean(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys],color='blue')
-        p.scatter(range(1,4),[np.mean(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys],color='blue')
+        line1 = p.plot(range(1,len(exp_keys)+1),[np.mean(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys],color='blue')
+        p.scatter(range(1,len(exp_keys)+1),[np.mean(1/arrs[lbl][d]['arat']) for lbl, e in exp_keys],color='blue')
         D = [np.mean(1/arrs[lbl][d]['rrat']) for lbl, e in exp_keys]
-        line2 = p.plot(range(1,4),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for lbl, e in exp_keys],color='green')
-        p.scatter(range(1,4),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for  lbl, e in exp_keys],color='green')
+        line2 = p.plot(range(1,len(exp_keys)+1),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for lbl, e in exp_keys],color='green')
+        p.scatter(range(1,len(exp_keys)+1),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for  lbl, e in exp_keys],color='green')
         
         plt.title(d)
         plt.ylim((0,1))
-        plt.xticks(range(1,4),('L1','L2','L3'))
+        plt.xticks(range(1,len(labels)+1), labels)
         
     plt.figlegend([line1, line2], ['Model', 'Random'], 'center right')
     plt.suptitle('Spatial clustering measure by imageset \nActual vs random mean-matched', fontsize=20)
     plt.draw()   
     plt.savefig('invariant_spatial_clustering_by_imageset.png')
     
-    plt.figure(figsize=(20, 6))
+    plt.figure(figsize=(20, 12))
     for e_ind, (lbl,e) in enumerate(exp_keys):
-        p = plt.subplot(1, 3, e_ind + 1)
+        #p = plt.subplot(1, 3, e_ind + 1)
+        p = plt.subplot(2, 3, e_ind + 1)
         B = p.boxplot([(1/arrs[lbl][d]['rrat']) for d in datasets])
         B1 = p.boxplot([(1/arrs[lbl][d]['arat']) for d in datasets])
         for b in B['boxes']:
@@ -676,8 +704,9 @@ def plot_clusteriness_invariant(arrs):
  
 def plot_performance_invariant(conn=None, host='localhost', port=27017):
  
-    
-    exp_keys = [('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+    exp_keys = [('Pixels',  u'simffa.simffa_bandit.SimffaPixelsInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('V1Like', u'simffa.simffa_bandit.SimffaV1LikeInvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
+                ('L1', u'simffa.simffa_bandit.SimffaL1InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L2', u'simffa.simffa_bandit.SimffaL2InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom'),
                 ('L3', u'simffa.simffa_bandit.SimffaL3InvariantBandit/hyperopt.theano_bandit_algos.TheanoRandom')]
     datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2', ]
@@ -700,9 +729,10 @@ def plot_performance_invariant(conn=None, host='localhost', port=27017):
     
     
     import matplotlib.pyplot as plt
-    plt.figure(figsize=(22,6))
+    plt.figure(figsize=(22,12))
     for e_ind, (lbl, e) in enumerate(exp_keys):
-        p = plt.subplot(1,3, e_ind + 1)
+        #p = plt.subplot(1,3, e_ind + 1)
+        p = plt.subplot(2,3, e_ind + 1)
         p.boxplot([Res[lbl][d]['Face_Nonface'] for d in datasets])
         p.plot(range(1,6), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets], color='g')
         p.scatter(range(1,6), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets], color='g')
@@ -722,7 +752,7 @@ def plot_performance_invariant(conn=None, host='localhost', port=27017):
         plt.plot(range(5), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets])
         plt.scatter(range(5), [Res[lbl][d]['Face_Nonface'].mean() for d in datasets])
         plt.xticks(range(5), datasets)
-    plt.legend(('L1','L2','L3'))
+    plt.legend(zip(*exp_keys)[0])
     plt.title('Face/Nonface Mean Performance')
     plt.savefig('invariant_performance_face_nonface_mean.png')
     
@@ -732,13 +762,14 @@ def plot_performance_invariant(conn=None, host='localhost', port=27017):
         plt.plot(range(5), [Res[lbl][d]['Face_Nonface'].max() for d in datasets])
         plt.scatter(range(5), [Res[lbl][d]['Face_Nonface'].max() for d in datasets])
         plt.xticks(range(5), datasets)
-    plt.legend(('L1','L2','L3'))
+    plt.legend(zip(*exp_keys)[0])
     plt.title('Face/Nonface max Performance')
     plt.savefig('invariant_performance_face_nonface_max.png')
 
-    plt.figure(figsize=(22,6))
+    plt.figure(figsize=(22,12))
     for e_ind, (lbl, e) in enumerate(exp_keys):
-        p = plt.subplot(1,3, e_ind + 1)
+        #p = plt.subplot(1,3, e_ind + 1)
+        p = plt.subplot(2,3, e_ind + 1)
         p.boxplot([Res[lbl][d]['Face_Body_Object'] for d in datasets])
         p.plot(range(1,6), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets], color='g')
         p.scatter(range(1,6), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets], color='g')
@@ -758,7 +789,7 @@ def plot_performance_invariant(conn=None, host='localhost', port=27017):
         plt.plot(range(5), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets])
         plt.scatter(range(5), [Res[lbl][d]['Face_Body_Object'].mean() for d in datasets])
         plt.xticks(range(5), datasets)
-    plt.legend(('L1','L2','L3'))
+    plt.legend(zip(*exp_keys)[0])
     plt.title('Face/Body/Object Mean Performance')
     plt.savefig('invariant_performance_face_body_object_mean.png')
     
@@ -768,7 +799,7 @@ def plot_performance_invariant(conn=None, host='localhost', port=27017):
         plt.plot(range(5), [Res[lbl][d]['Face_Body_Object'].max() for d in datasets])
         plt.scatter(range(5), [Res[lbl][d]['Face_Body_Object'].max() for d in datasets])
         plt.xticks(range(5), datasets)
-    plt.legend(('L1','L2','L3'))
+    plt.legend(zip(*exp_keys)[0])
     plt.title('Face/Body/Object max Performance')
     plt.savefig('invariant_performance_face_body_object_max.png')
 
