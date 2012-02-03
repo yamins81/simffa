@@ -152,14 +152,14 @@ v1like_filter = dict(
 
 v1like_rescale = {'kwargs': {'stride' : choice([3, 4, 5])}}
 
-v1like_params = {'desc': [
-            [('lnorm', lnorm),
-             ('fbcorr', v1like_filter),
-             ('lnorm', lnorm),
-             ('activ', activ),
-             ('lpool', v1like_lpool),
-             ('rescale', v1like_rescale)],
-           ]}
+v1d = [[('lnorm', lnorm),
+        ('fbcorr', v1like_filter),
+        ('lnorm', lnorm),
+        ('activ', activ),
+        ('lpool', v1like_lpool),
+        ('rescale', v1like_rescale)]]
+             
+v1like_params = {'desc': v1d}
 
 
 ######pixels
@@ -172,4 +172,23 @@ pixels_params = {'desc': [
                 [('lpool', pixels_lpool),
                  ('rescale', pixels_rescale)],
              ]}
+             
+             
+######v1like subsets
+
+v1_fap = [[('fbcorr', v1like_filter),
+           ('activ', activ),
+           ('lpool', v1like_lpool),
+           ('rescale', v1like_rescale)]]
+           
+v1_fp = [[('fbcorr', v1like_filter),
+           ('lpool', v1like_lpool),
+           ('rescale', v1like_rescale)]]
+
+v1like_spectrum_params = {'desc': choice([v1_fap, v1_fp] + 
+                                         [[[v1d[0][_i] for _i in [i, -1]]] for i in range(1,len(v1d[0])-1)] + \
+                                         [[[v1d[0][_i] for _i in range(i) + [-1] ]] for i in range(1,len(v1d[0]))]
+                          )}
+
+
 

@@ -66,7 +66,8 @@ class BaseFaceBodyObjectInvariant(object):
     IMDIR = 'Generated_Images'
 
     def __init__(self, meta=None, seed=0, ntrain=10, ntest=10,
-                 num_splits=5, gseed=0, make_original=False):
+                 num_splits=5, gseed=0, make_original=False,
+                 new_backgrounds=False):
 
         self.seed = seed
         self.ntrain = ntrain

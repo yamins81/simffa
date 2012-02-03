@@ -228,6 +228,11 @@ class SimffaV1LikeInvariantBandit(SimffaInvariantBandit):
     training_data = {'num_splits': 3}
     source_string = gh.string(simffa_params.v1like_params)
     
+    
+class SimffaV1LikeSpectrumInvariantBandit(SimffaInvariantBandit):
+    training_data = {'num_splits': 3}
+    source_string = gh.string(simffa_params.v1like_spectrum_params)
+
 
 ########################
 ########Facelike bandits
