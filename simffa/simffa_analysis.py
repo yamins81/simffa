@@ -807,3 +807,165 @@ def plot_performance_invariant(conn=None, host='localhost', port=27017):
     plt.close('all')
     
     return Res
+
+
+def plot_fsi_fractions_v1like_spectrum(conn=None, host='localhost', port=27017):
+    exp_key = 'simffa.simffa_bandit.SimffaV1LikeSpectrumInvariantBandit/hyperopt.Random'
+    
+    if conn is None:
+        conn = pm.Connection(host, port)    
+    Jobs = conn['hyperopt']['jobs']
+    
+    F = lambda x : [y[0] for y in x['spec']['desc'][0]]
+    
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2', ]
+    
+    import matplotlib.pyplot as plt
+    
+    sym = {'fbcorr': '|', 'lpool': 'p', 'lnorm' : 'n', 'rescale': '', 'activ': 'a'}
+    curs = Jobs.find({'exp_key': exp_key, 'state': 2}, fields=['spec'] + ['result.' + d + '.fsi_fractions' for d in datasets])
+    fracs = {}
+    for rec in curs:
+        s = ''.join([sym[_c] for _c in F(rec)])
+        for d in datasets:
+            if d not in fracs:
+                fracs[d] = {}
+            if s not in fracs[d]:
+                fracs[d][s] = []
+            fracs[d][s].append(rec['result'][d]['fsi_fractions'])
+    for d in fracs:
+        for s in fracs[d]:
+            fracs[d][s] = np.array(fracs[d][s])
+            
+    plt.figure(figsize=(16,10))
+    
+    lbls = ['a', 'n', 'p',  '|', '|p', 'n|', '|ap', 'n|n', 'n|na',   'n|nap']
+
+    for e_ind, lbl in enumerate(lbls):
+        #p = plt.subplot(1, 3, e_ind + 1)
+        p = plt.subplot(4, 3, e_ind + 1)
+
+        for d in datasets:
+            p.plot(fracs[d][lbl].mean(0))
+        plt.title(lbl)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    plt.subplots_adjust(hspace=.6)
+    plt.figlegend(lines, datasets, 'upper right')
+    plt.suptitle('V1like spectrum FSI Curves by model class', fontsize=20)
+    plt.savefig('v1like_spectrum_fsi_by_model_class.png')
+    
+    plt.figure(figsize=(18,11))
+    
+    for d_ind, d in enumerate(datasets):
+        
+        p = plt.subplot(2,3, d_ind + 1)
+        for e_ind, lbl in enumerate(lbls):
+            linestyle = '-' if e_ind < 5 else '--'
+            p.plot(fracs[d][lbl].mean(0), linestyle=linestyle)
+        plt.title(d)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    
+    #plt.subplots_adjust(wspace=.05)
+    plt.figlegend(lines,lbls, 'upper right')
+    plt.suptitle('V1like spectrum FSI Curves by imageset', fontsize=20)
+    plt.savefig('v1like_spectrum_fsi_by_imageset.png')
+    
+
+def get_clusteriness_v1like_spectrum(mj = None, host='localhost', port=27017):
+
+    exp_key = 'simffa.simffa_bandit.SimffaV1LikeSpectrumInvariantBandit/hyperopt.Random'
+    
+    lbls = ['a', 'n', 'p',  '|', '|p', 'n|', '|ap', 'n|n', 'n|na',   'n|nap']
+    
+    sym = {'|': 'fbcorr','p': 'lpool', 'n': 'lnorm', 'a': 'activ'}
+   
+    if mj is None:
+        options = host + ':' + str(port) + '/hyperopt' 
+        mj = MongoJobs.new_from_connection_str(as_mongo_str(options) + '/jobs')
+    
+    datasets = ['original', 'invariant0', 'invariant1', 'invariant2', 'invariant_flip']
+    
+    arrs = {}
+    for lbl in lbls:
+        arrs[lbl] = {}
+        q = {'exp_key': exp_key, 'state':2}
+        for (lind, l) in enumerate(lbl):
+            q['spec.desc.0.' + str(lind) + '.0'] = sym[l]
+        for d in datasets:
+            print q, d
+            nfk = 'result.' + d + '.num_features'
+            fsk = 'result.' + d + '.Face_selective_s_avg'
+            fsik = 'result.' + d + '.fsi_fractions'
+            arrs[lbl][d] = get_clusteriness(nfk, fsk, fsik, mj, q, Frac=10)
+            
+    return arrs
+
+
+def plot_clusteriness_v1like_spectrum(arrs):
+
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2', ]
+    lbls = ['a', 'p', 'n', '|', '|p', 'n|', 'n|n', '|ap','n|na',   'n|nap']
+    
+    notnan = lambda _x : _x[np.invert(np.isnan(_x))]
+    
+    arrs = copy.deepcopy(arrs)
+    for lbl in lbls:
+        for d in datasets:
+            if arrs[lbl][d] is None:
+                arrs[lbl][d] = {'rrat': np.array([np.inf]), 'arat': np.array([np.inf])}
+
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(20,12))
+    for d_ind, d in enumerate(datasets):
+        p = plt.subplot(2, 3, d_ind + 1)
+        B = p.boxplot([(1/arrs[lbl][d]['rrat']) for lbl in lbls])
+        B1 = p.boxplot([(1/arrs[lbl][d]['arat']) for lbl in lbls])
+        for b in B['boxes']:
+            b.set_color('g')
+    
+        line1 = p.plot(range(1,len(lbls)+1),[np.mean(1/arrs[lbl][d]['arat']) for lbl in lbls],color='blue')
+        p.scatter(range(1,len(lbls)+1),[np.mean(1/arrs[lbl][d]['arat']) for lbl in lbls],color='blue')
+        D = [np.mean(1/arrs[lbl][d]['rrat']) for lbl in lbls]
+        line2 = p.plot(range(1,len(lbls)+1),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for lbl in lbls],color='green')
+        p.scatter(range(1,len(lbls)+1),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for  lbl in lbls],color='green')
+        
+        plt.title(d)
+        plt.ylim((0,1))
+        plt.xticks(range(1,len(lbls)+1), lbls)
+
+    plt.figlegend([line1, line2], ['Model', 'Random'], 'center right')
+    plt.suptitle('Spatial clustering measure by imageset \nV1like-specturm', fontsize=20)
+    plt.draw()   
+    plt.savefig('v1like_spectrum_spatial_clustering_by_imageset.png')
+    
+    plt.figure(figsize=(20, 20))
+    for e_ind, lbl  in enumerate(lbls):
+        #p = plt.subplot(1, 3, e_ind + 1)
+        p = plt.subplot(4, 3, e_ind + 1)
+        B = p.boxplot([(1/arrs[lbl][d]['rrat']) for d in datasets])
+        B1 = p.boxplot([(1/arrs[lbl][d]['arat']) for d in datasets])
+        for b in B['boxes']:
+            b.set_color('g')
+    
+        line1 = p.plot(range(1,6),[np.mean(1/arrs[lbl][d]['arat']) for d in datasets],color='blue')
+        p.scatter(range(1,6),[np.mean(1/arrs[lbl][d]['arat']) for d in datasets],color='blue')
+        line2 = p.plot(range(1, 6),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for d in datasets],color='green')
+        p.scatter(range(1,6),[np.mean(notnan(1/arrs[lbl][d]['rrat'])) for d in datasets],color='green')
+        
+        plt.title(lbl)
+        plt.ylim((0,1))
+        plt.xticks(range(1,6),datasets)
+            
+    plt.subplots_adjust(hspace=.4)    
+    plt.figlegend([line1, line2], ['Model', 'Random'], 'center right')
+    plt.suptitle('Spatial clustering measure by model class: V1like spectrum', fontsize=20, y=1)
+    plt.draw()
+    plt.savefig('v1like_spectrum_spatial_clustering_by_model_class.png')
+    
+    plt.close('all')
