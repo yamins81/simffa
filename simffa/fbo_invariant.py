@@ -19,6 +19,8 @@ import hashlib
 import cPickle
 
 import numpy as np
+import scipy.signal as signal
+import scipy.ndimage as ndimage
 
 import skdata.larray as larray
 import Image
@@ -55,7 +57,23 @@ def get_modified_image(cimg, bimg, inv_data):
     bimg.paste(cimg, box, mask)
 
     return bimg
+
         
+def get_overall_spectrum(imfiles):
+    m = np.zeros((400, 400))
+    for imf in imfiles:
+        m += np.abs(signal.fft2(ndimage.imread(imf, flatten=True)/255.0))
+    m = m / len(imfiles)
+    return m
+
+
+def get_background_noise(m, rng):
+    grand_sd = 50.
+    grand_u = 128.
+    randphase = np.angle(signal.fft2(rng.random_sample(m.shape)))
+    noise = np.real(signal.ifft2(m * np.exp(randphase * 1j)))
+    noise = (noise - noise.mean(0)) * grand_sd / noise.std() + grand_u
+    return noise
     
     
 class BaseFaceBodyObjectInvariant(object):
@@ -64,17 +82,17 @@ class BaseFaceBodyObjectInvariant(object):
     SHA1 = 'c688b13f1f9e6723c5a99b0ccf477cf2805b236f'
     SUBDIR = 'FaceBodyObjectInvariant_2011_08_03'
     IMDIR = 'Generated_Images'
+    new_background = False
+    make_original = False
 
     def __init__(self, meta=None, seed=0, ntrain=10, ntest=10,
-                 num_splits=5, gseed=0, make_original=False,
-                 new_backgrounds=False):
+                 num_splits=5, gseed=0):
 
         self.seed = seed
         self.ntrain = ntrain
         self.ntest = ntest
         self.num_splits = num_splits
         self.names = ['Face','Body','Object']
-        self.make_original = make_original
         
         self.genson_template = gd.gDist(self.genson_string)
         self.genson_template.seed(gseed)
@@ -120,21 +138,25 @@ class BaseFaceBodyObjectInvariant(object):
         if not path.exists(imdir):
             os.mkdir(imdir)
         
-            #generate images and metadata pkl
             background_dir = os.path.join(self.home(self.SUBDIR),'pink_noise')
-            cutout_dir =  os.path.join(self.home(self.SUBDIR),'cutouts')
+            cutout_dir = os.path.join(self.home(self.SUBDIR),'cutouts')
             cutout_files = filter(lambda x: x.startswith('im'), os.listdir(cutout_dir))
+        
+            if self.new_backgrounds:
+                cfiles = [os.path.join(cutout_dir, cf) for cf in cutout_files]
+                background_spec = get_overall_spectrum(cfiles)
+                background_rng = np.random.RandomState(0)
+      
             metadata = []
             for cf in cutout_files:
                 print os.path.join(cutout_dir,cf)
                 ind = int(os.path.split(cf)[1].split('.')[0][2:])
-                bg = 'impink' +  str(ind) + '.png'
                 cimg = Image.open(os.path.join(cutout_dir,cf))
+                mask = cimg.convert('RGBA').split()[-1]                
+                bg = 'impink' +  str(ind) + '.png'
                 bimg = Image.open(os.path.join(background_dir,bg))
-                mask = cimg.convert('RGBA').split()[-1]
                 
                 #original image
-                
                 name = 'Face' if ind < 21 else 'Body' if ind < 41 else 'Object'
                 if self.make_original:
                     im = bimg.copy()
@@ -152,6 +174,11 @@ class BaseFaceBodyObjectInvariant(object):
                  
                 for _ind in range(self.NUM_GENERATE_PER_ORIGINAL):
                     inv_data = self.genson_template.sample()
+                    if self.new_backgrounds:
+                        bimg = Image.fromarray(get_background_noise(background_spec, background_rng))
+                        bimg = bimg.convert('LA')
+                        #bfilename = os.path.join(bdir,'generated_' + str(ind) + '_' + str(_ind)) + '.png'
+                        #bimg.save(bfilename)
                     im = get_modified_image(cimg, bimg, inv_data)
                     filename = os.path.join(imdir,'generated_' + str(ind) + '_' + str(_ind)) + '.png'
                     im.save(filename)
@@ -293,4 +320,20 @@ class FaceBodyObject20110803InvariantFlip(BaseFaceBodyObjectInvariant):
                         "rot": 0,
                         "flip_lr": choice([0, 1]),
                         "flip_ud": choice([0, 1])}"""
+
+
+class FaceBodyObject20110803Invariant0_b(FaceBodyObject20110803Invariant0):
+    new_backgrounds = True
+
+
+class FaceBodyObject20110803Invariant1_b(FaceBodyObject20110803Invariant1):
+    new_backgrounds = True
+
+
+class FaceBodyObject20110803Invariant2_b(FaceBodyObject20110803Invariant2):
+    new_backgrounds = True
+                        
+
+class FaceBodyObject20110803InvariantFlip_b(FaceBodyObject20110803InvariantFlip):
+    new_backgrounds = True
     
