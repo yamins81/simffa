@@ -96,8 +96,11 @@ def evaluate_FSI(dataset, config, train=True, **training_data):
     meta = dataset.meta
     face_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] == 'Face']
     bo_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] != 'Face']
+    features = features - features.min()
     F = features[face_inds].mean(0)
+    #F = np.where(F >= 0, F, 1e-6)
     BO = features[bo_inds].mean(0)
+    #BO = np.where(BO >= 0, BO, 1e-6)
     FSI = (F - BO) / (np.abs(F) + np.abs(BO))
     FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
     FSI_fractions = [c/ float(num_features) for c in FSI_counts]
