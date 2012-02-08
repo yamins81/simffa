@@ -19,6 +19,7 @@ import hashlib
 import cPickle
 
 import numpy as np
+import scipy.misc
 import scipy.signal as signal
 import scipy.ndimage as ndimage
 
@@ -62,7 +63,8 @@ def get_modified_image(cimg, bimg, inv_data):
 def get_overall_spectrum(imfiles):
     m = np.zeros((400, 400))
     for imf in imfiles:
-        m += np.abs(signal.fft2(ndimage.imread(imf, flatten=True)/255.0))
+        #m += np.abs(signal.fft2(ndimage.imread(imf, flatten=True)/255.0))
+        m += np.abs(signal.fft2(scipy.misc.imread(imf, flatten=True)/255.0))
     m = m / len(imfiles)
     return m
 
