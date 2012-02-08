@@ -82,44 +82,55 @@ def evaluate_just_FSI(dataset, config, train=False, **training_data):
     for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
         spatial_averages[k] = record.pop(k)       
     return record, FSI
+    
 
-
+    
+    
 def evaluate_FSI(dataset, config, train=True, **training_data):
     X, y = dataset.img_classification_task()
     features = get_features(X, config, verbose=True)
     fs = features.shape
-    num_features = fs[1]*fs[2]*fs[3]
-    record = {}
-    record['num_features'] = num_features
-    record['feature_shape'] = fs
-    thresholds = np.arange(0,1,.01)
+    num_features = fs[1]*fs[2]*fs[3]    
     meta = dataset.meta
     face_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] == 'Face']
     bo_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] != 'Face']
     
+    record = {}
+    record['num_features'] = num_features
+    record['feature_shape'] = fs
+    thresholds = np.arange(0,1,.01)
+    record['thresholds'] = thresholds.tolist()
     
-    #features = features - features.min()
     F = features[face_inds].mean(0)
-    #F = np.where(F >= 0, F, 1e-6)
     BO = features[bo_inds].mean(0)
-    #BO = np.where(BO >= 0, BO, 1e-6)
+    record['F_s_avg'] = F.mean(2).tolist()
+    record['BO_s_avg'] = BO.mean(2).tolist()
+  
     FSI = (F - BO) / (np.abs(F) + np.abs(BO))
+    FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
+    FSI_fractions = [c/ float(num_features) for c in FSI_counts]
+    record['fsi_fractions'] = FSI_fractions
+    record['FSI_s_avg'] = FSI.mean(2).tolist()
+    record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
+    
+    dprime = (F - BO) / features.std(0)
+    dprime_h, dprime_b = np.histogram(dprime, bins=50)
+    record['dprime_hist'] = dprime_h.tolist()
+    record['dprime_bins'] = dprime_b.tolist()
+    record['dprime_selective_fraction'] = float(len((dprime.flatten() > 1).nonzero()[0]) / float(num_features))
+    record['dprime_selective_s_avg'] = (dprime > 1).astype(np.float).mean(2).tolist()
     
     Z = np.row_stack([features[face_inds], features[bo_inds]])
     R = Z.argsort(0)
-    
     nf = len(face_inds)
     ndist = len(bo_inds)
-    FSI = (R[:nf].sum(0) - ((nf)**2 + nf)/2.) / float(nf*ndist)
+    roc_FSI = (R[:nf].sum(0) - ((nf)**2 + nf)/2.) / float(nf*ndist)
+    roc_FSI_counts = [len((roc_FSI > thres).nonzero()[0]) for thres in thresholds]
+    roc_FSI_fractions = [c/ float(num_features) for c in roc_FSI_counts]
+    record['roc_fsi_fractions'] = roc_FSI_fractions
+    record['roc_FSI_s_avg'] = roc_FSI.mean(2).tolist()
+    record['roc_Face_selective_s_avg'] = (roc_FSI > .75).astype(np.float).mean(2).tolist()
     
-    FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
-    FSI_fractions = [c/ float(num_features) for c in FSI_counts]
-    record['thresholds'] = thresholds.tolist()
-    record['fsi_fractions'] = FSI_fractions
-    record['F_s_avg'] = F.mean(2).tolist()
-    record['BO_s_avg'] = BO.mean(2).tolist()
-    record['FSI_s_avg'] = FSI.mean(2).tolist()
-    record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
     if train:
         features = features.reshape((fs[0],num_features))
         STATS = ['train_accuracy','train_ap','train_auc','test_accuracy','test_ap','test_auc']
@@ -188,6 +199,8 @@ class SimffaL3GaborBandit(SimffaBandit):
 
 class SimffaInvariantBandit(gb.GensonBandit):
     training_data = {}
+    train = True
+    new_backgrounds = False
     
     def __init__(self):
         super(SimffaInvariantBandit, self).__init__(source_string=self.source_string)
@@ -195,27 +208,38 @@ class SimffaInvariantBandit(gb.GensonBandit):
     @classmethod
     def evaluate(cls, config, ctrl):
         dataset = skdata.fbo.FaceBodyObject20110803() 
-        original_record, FSI = evaluate_FSI(dataset, config, train=True, **cls.training_data)
-        invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
-        invariant_record0, FSI = evaluate_FSI(invariant_dataset0, config, train=True, **cls.training_data)
-        invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
-        invariant_record1, FSI = evaluate_FSI(invariant_dataset1, config, train=True, **cls.training_data)
-        invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
-        invariant_record2, FSI = evaluate_FSI(invariant_dataset2, config, train=True, **cls.training_data)
-        invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
-        invariant_record_flip, FSI = evaluate_FSI(invariant_dataset_flip, config, train=True, **cls.training_data)            
+        original_record, FSI = evaluate_FSI(dataset, config, train=cls.train, **cls.training_data)
+        if cls.new_backgrounds:
+            invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0_b() 
+            invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1_b() 
+            invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2_b() 
+            invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip_b() 
+        else:
+            invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
+            invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
+            invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
+            invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
+        invariant_record0, FSI = evaluate_FSI(invariant_dataset0, config, train=cls.train, **cls.training_data)
+        invariant_record1, FSI = evaluate_FSI(invariant_dataset1, config, train=cls.train, **cls.training_data)
+        invariant_record2, FSI = evaluate_FSI(invariant_dataset2, config, train=cls.train, **cls.training_data)
+        invariant_record_flip, FSI = evaluate_FSI(invariant_dataset_flip, config, train=cls.train, **cls.training_data)            
         record = {'original': original_record, 
                   'invariant0': invariant_record0,
                   'invariant1': invariant_record1,
                   'invariant2': invariant_record2,
                   'invariant_flip': invariant_record_flip}
+        Ks = ['F_s_avg', 'BO_s_avg', 'FSI_s_avg', 'Face_selective_s_avg',
+              'dprime_selective_s_avg','roc_FSI_s_avg', 'roc_Face_selective_s_avg']
         if hasattr(ctrl, 'set_attachment'):
             for k in record:
-                for l in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg', 'Face_selective_s_avg']:
+                for l in Ks:
                     spatial_averages = record[k].pop(l)
                     blob = cPickle.dumps(spatial_averages)
                     ctrl.set_attachment(blob, 'spatial_averages_' + k + '_' + l)
-        record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
+        if cls.train:
+            record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
+        else:
+            record['loss'] = 1
         print('DONE')
         return record
 
@@ -246,53 +270,35 @@ class SimffaV1LikeSpectrumInvariantBandit(SimffaInvariantBandit):
     training_data = {'num_splits': 3}
     source_string = gh.string(simffa_params.v1like_spectrum_params)
    
-   
-class SimffaInvariantBanditNewBackgrounds(gb.GensonBandit):
-    training_data = {}
     
-    def __init__(self):
-        super(SimffaInvariantBanditNewBackgrounds, self).__init__(source_string=self.source_string)
-
-    @classmethod
-    def evaluate(cls, config, ctrl):
-        dataset = skdata.fbo.FaceBodyObject20110803() 
-        original_record, FSI = evaluate_FSI(dataset, config, train=True, **cls.training_data)
-        invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0_b() 
-        invariant_record0, FSI = evaluate_FSI(invariant_dataset0, config, train=True, **cls.training_data)
-        invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1_b() 
-        invariant_record1, FSI = evaluate_FSI(invariant_dataset1, config, train=True, **cls.training_data)
-        invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2_b() 
-        invariant_record2, FSI = evaluate_FSI(invariant_dataset2, config, train=True, **cls.training_data)
-        invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip_b() 
-        invariant_record_flip, FSI = evaluate_FSI(invariant_dataset_flip, config, train=True, **cls.training_data)            
-        record = {'original': original_record, 
-                  'invariant0': invariant_record0,
-                  'invariant1': invariant_record1,
-                  'invariant2': invariant_record2,
-                  'invariant_flip': invariant_record_flip}
-        if hasattr(ctrl, 'set_attachment'):
-            for k in record:
-                for l in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg', 'Face_selective_s_avg']:
-                    spatial_averages = record[k].pop(l)
-                    blob = cPickle.dumps(spatial_averages)
-                    ctrl.set_attachment(blob, 'spatial_averages_' + k + '_' + l)
-        record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
-        print('DONE')
-        return record
-
-    
-class SimffaL1InvariantBanditNewBackgrounds(SimffaInvariantBanditNewBackgrounds):
-    training_data = {'num_splits': 3}
+class SimffaL1InvariantBanditNew(SimffaInvariantBandit):
+    new_backgrounds = True
+    train = False
     source_string = gh.string(simffa_params.l1_params)
 
 
-class SimffaL2InvariantBanditNewBackgrounds(SimffaInvariantBanditNewBackgrounds):
+class SimffaL2InvariantBanditNew(SimffaInvariantBandit):
+    new_backgrounds =True
+    train = False
     source_string = gh.string(simffa_params.l2_params)
 
 
-class SimffaL3InvariantBanditNewBackgrounds(SimffaInvariantBanditNewBackgrounds):
+class SimffaL3InvariantBanditNew(SimffaInvariantBandit):
+    new_backgrounds = True
+    train = False
     source_string = gh.string(simffa_params.l3_params)
 
+
+class SimffaPixelsInvariantBanditNew(SimffaInvariantBandit):
+    new_backgrounds = True
+    train = False
+    source_string = gh.string(simffa_params.pixels_params)
+
+
+class SimffaV1LikeInvariantBanditNew(SimffaInvariantBandit):
+    new_backgrounds = True
+    train = False
+    source_string = gh.string(simffa_params.v1like_params)
 
 
 
