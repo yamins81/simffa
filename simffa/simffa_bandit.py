@@ -112,6 +112,25 @@ def evaluate_FSI(dataset, config, train=True, **training_data):
     record['fsi_fractions'] = FSI_fractions
     record['FSI_s_avg'] = FSI.mean(2).tolist()
     record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
+
+    F_rect = np.abs(features[face_inds]).mean(0)
+    BO_rect = np.abs(features[bo_inds]).mean(0)
+    FSI_rect = (F_rect - BO_rect) / (F_rect + BO_rect)
+    FSI_rect_counts = [len((FSI_rect > thres).nonzero()[0]) for thres in thresholds]
+    FSI_rect_fractions = [c/ float(num_features) for c in FSI_rect_counts]
+    record['rectified_fsi_fractions'] = FSI_rect_fractions
+    record['rectified_FSI_s_avg'] = FSI_rect.mean(2).tolist()
+    record['rectified_Face_selective_s_avg'] = (FSI_rect > .333).astype(np.float).mean(2).tolist()
+
+    features_shifted = features - features.min()
+    F_shifted = features_shifted[face_inds].mean(0)
+    BO_shifted = features_shifted[bo_inds].mean(0)
+    FSI_shifted = (F_shifted - BO_shifted) / (F_shifted + BO_shifted)
+    FSI_shifted_counts = [len((FSI_shifted > thres).nonzero()[0]) for thres in thresholds]
+    FSI_shifted_fractions = [c/ float(num_features) for c in FSI_shifted_counts]
+    record['shifted_fsi_fractions'] = FSI_shifted_fractions
+    record['shifted_FSI_s_avg'] = FSI_shifted.mean(2).tolist()
+    record['shifted_Face_selective_s_avg'] = (FSI_shifted > .333).astype(np.float).mean(2).tolist()
     
     dprime = (F - BO) / features.std(0)
     dprime_h, dprime_b = np.histogram(dprime, bins=50)
@@ -228,8 +247,8 @@ class SimffaInvariantBandit(gb.GensonBandit):
                   'invariant1': invariant_record1,
                   'invariant2': invariant_record2,
                   'invariant_flip': invariant_record_flip}
-        Ks = ['F_s_avg', 'BO_s_avg', 'FSI_s_avg', 'Face_selective_s_avg',
-              'dprime_selective_s_avg','roc_FSI_s_avg', 'roc_Face_selective_s_avg']
+        Ks = [_x + _y for _y in ['FSI_s_avg', 'Face_selective_s_avg'] for _x in ['','shifted_', 'rectified_']] + \
+             ['F_s_avg', 'BO_s_avg', 'dprime_selective_s_avg','roc_FSI_s_avg', 'roc_Face_selective_s_avg']
         if hasattr(ctrl, 'attachments'):
             for k in record:
                 for l in Ks:
