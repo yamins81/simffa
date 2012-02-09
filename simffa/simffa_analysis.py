@@ -5,6 +5,7 @@ import pymongo as pm
 import numpy as np
 import tabular as tb
 import scipy.signal as signal
+import scipy.stats as stats
 
 from hyperopt.mongoexp import MongoJobs, as_mongo_str
 
@@ -969,3 +970,167 @@ def plot_clusteriness_v1like_spectrum(arrs):
     plt.savefig('v1like_spectrum_spatial_clustering_by_model_class.png')
     
     plt.close('all')
+
+
+#####new measures
+
+def new_averages(conn=None, host='localhost', port=27017):
+    exp_keys = [('Pixels', 'simffa.simffa_bandit.SimffaPixelsInvariantBanditNew/hyperopt.Random/new'),
+                ('V1Like', 'simffa.simffa_bandit.SimffaV1LikeInvariantBanditNew/hyperopt.Random/new'),
+                ('L1', 'simffa.simffa_bandit.SimffaL1InvariantBanditNew/hyperopt.Random/new'),
+                ('L2', 'simffa.simffa_bandit.SimffaL2InvariantBanditNew/hyperopt.Random/new'),
+                ('L3', 'simffa.simffa_bandit.SimffaL3InvariantBanditNew/hyperopt.Random/new')]
+
+
+    if conn is None:
+        conn = pm.Connection(host, port)    
+    Jobs = conn['hyperopt']['jobs']
+    
+    datasets = ['original', 'invariant_flip', 'invariant0', 'invariant1', 'invariant2']
+    f = new_averages_by_metric(Jobs, exp_keys, datasets, 'rectified_fsi_fractions', 90)
+    f = new_averages_by_metric(Jobs, exp_keys, datasets, 'shifted_fsi_fractions', 90)
+    
+
+def new_averages_by_metric(Jobs, exp_keys, datasets, metric, pctl):
+    fracs = {}
+    for lbl, e in exp_keys:
+        fracs[lbl] = {}
+        for d in datasets:
+            L = Jobs.find({'exp_key': e, 'state': 2}, fields=['result.' + d + '.' + metric])
+            fracs[lbl][d] = np.array([l['result'][d][metric] for l in L])
+            
+    import matplotlib.pyplot as plt
+    
+    plt.figure(figsize=(16,10))
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        #p = plt.subplot(1, 3, e_ind + 1)
+        p = plt.subplot(3, 2, e_ind + 1)
+        for d in datasets:
+            p.plot(fracs[lbl][d].mean(0))
+        if p.colNum == 0:
+            plt.ylabel('frac. units at this value, model class avg')
+        else:
+            #p.yaxis.set_visible(False)
+            pass
+        plt.title(lbl)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    plt.figlegend(lines, datasets, 'upper right')
+    plt.suptitle('Model-class-averaged %s Curves by model class' % metric, fontsize=20)
+    plt.savefig('%s_by_model_class.png' % metric)
+
+    plt.figure(figsize=(16,10))
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        #p = plt.subplot(1, 3, e_ind + 1)
+        p = plt.subplot(3, 2, e_ind + 1)
+        for d in datasets:
+            pl = [stats.scoreatpercentile(fracs[lbl][d][:,ind], pctl) for ind in range(fracs[lbl][d].shape[1])]
+            p.plot(pl)
+        if p.colNum == 0:
+            plt.ylabel('fraction of units at value, pctl %d' % pctl)
+        else:
+            #p.yaxis.set_visible(False)
+            pass
+        plt.title(lbl)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    plt.figlegend(lines, datasets, 'upper right')
+    plt.suptitle('Model-class %d pcntl %s curves by model class' % (pctl, metric), fontsize=20)
+    plt.savefig('%s_by_model_class_%d_pctl.png' % (metric, pctl))
+    
+    plt.figure(figsize=(18,11))
+    for d_ind, d in enumerate(datasets):
+        p = plt.subplot(2,3, d_ind + 1)
+        for lbl, e in exp_keys:
+            p.plot(fracs[lbl][d].mean(0))
+        plt.title(d)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    #plt.subplots_adjust(wspace=.05)
+    plt.figlegend(lines, zip(*exp_keys)[0], 'upper right')
+    plt.suptitle('Model-class-averaged %s Curves by imageset' % metric, fontsize=20)
+    plt.savefig('%s_by_image_class.png' % metric)
+
+    plt.figure(figsize=(18,11))
+    for d_ind, d in enumerate(datasets):
+        p = plt.subplot(2,3, d_ind + 1)
+        for lbl, e in exp_keys:
+            pl = [stats.scoreatpercentile(fracs[lbl][d][:,ind], pctl) for ind in range(fracs[lbl][d].shape[1])]
+            p.plot(pl)
+        plt.title(d)
+        lines = p.lines[:]
+        plt.xlabel('100 * FSI value')
+        plt.ylim((0,0.55))
+        plt.axvline(x=33, linestyle='--', linewidth=3)
+    plt.figlegend(lines, zip(*exp_keys)[0], 'upper right')
+    plt.suptitle('Model-class %d pctl %s curves by imageset' % (pctl, metric), fontsize=20)
+    plt.savefig('%s_by_image_class_%d_pctl.png' % (metric, pctl))
+
+    plt.figure(figsize=(20, 15))
+    _i = 0
+    for lbl, e in exp_keys:
+        for d in datasets:
+            #p = plt.subplot(3, 5, _i + 1)
+            p = plt.subplot(5, 5, _i + 1)
+            _i += 1
+            p.boxplot(fracs[lbl][d][:,::10])
+            p.plot(range(1,11), fracs[lbl][d].mean(0)[::10], color='g')
+            p.scatter(range(1,11), fracs[lbl][d].mean(0)[::10], color='g')
+            plt.xticks(range(1, 11), np.arange(0, 1.1, .1))
+            plt.yticks(np.arange(0,1.1,.1))
+            plt.axhline(y=.15, linestyle='-.')
+            plt.title(lbl + ' ' + d)
+            plt.ylim((0,1))
+            if p.colNum == 0:
+                plt.ylabel('Fraction of units')
+            if p.rowNum == 2:
+                plt.xlabel('value')
+    
+    plt.suptitle('Fraction of units vs %s value (every tenth)' % metric, fontsize=20)
+    plt.subplots_adjust(hspace=.4)
+    plt.savefig('%s_boxplots.png' % metric)
+    
+    plt.close('all')
+    return fracs
+
+
+def get_fracs(Jobs, exp_keys, datasets, metric, pctl):
+    fracs = {}
+    for lbl, e in exp_keys:
+        fracs[lbl] = {}
+        for d in datasets:
+            L = Jobs.find({'exp_key': e, 'state': 2}, fields=['result.' + d + '.' + metric])
+            fracs[lbl][d] = np.array([l['result'][d][metric] for l in L])
+
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(16,10))
+    for e_ind, (lbl, e) in enumerate(exp_keys):
+        p = plt.subplot(3, 2, e_ind + 1)
+        plt.plot([fracs[lbl][d].mean() for d in datasets])
+        plt.plot([stats.scoreatpercentile(fracs[lbl][d], pctl) for d in datasets])
+        plt.plot([fracs[lbl][d].max() for d in datasets])
+        lines = p.lines
+        plt.title(lbl)
+        plt.xticks(range(len(datasets)), datasets)
+    plt.suptitle('%s Curves by model class' % metric, fontsize=20)
+    plt.figlegend(lines, ['mean', '%d pctl' % pctl, 'max'], 'lower right')
+    plt.savefig('%s_by_model_class.png' % metric)
+ 
+    plt.figure(figsize=(18,11))
+    for d_ind, d in enumerate(datasets):
+        p = plt.subplot(2,3, d_ind + 1)
+        plt.plot([fracs[lbl][d].mean() for lbl, e in exp_keys])
+        plt.plot([stats.scoreatpercentile(fracs[lbl][d], pctl) for lbl, e in exp_keys])
+        plt.plot([fracs[lbl][d].max() for lbl, e in exp_keys])
+        lines = p.lines
+        plt.title(d)
+        plt.xticks(range(len(exp_keys)), zip(*exp_keys)[0])
+    plt.suptitle('%s Curves by imageset' % metric, fontsize=20)
+    plt.figlegend(lines, ['mean', '%d pctl' % pctl, 'max'], 'lower right')
+    plt.savefig('%s_by_imageset.png' % metric)
