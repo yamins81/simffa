@@ -314,11 +314,10 @@ class SimffaPixelsInvariantBanditNew(SimffaInvariantBandit):
     source_string = gh.string(simffa_params.pixels_params)
 
 
-class SimffaV1LikeInvariantBanditNew(SimffaInvariantBandit):
+class SimffaV1LikeSpectrumInvariantBanditNew(SimffaInvariantBandit):
     new_backgrounds = True
     train = False
-    source_string = gh.string(simffa_params.v1like_params)
-
+    source_string = gh.string(simffa_params.v1like_spectrum_params)
 
 
 ########################
