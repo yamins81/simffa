@@ -20,6 +20,7 @@ from scipy.io import loadmat
 import skdata.larray as larray
 from skdata.data_home import get_data_home
 from skdata.utils import download_boto, extract, int_labels
+# from skdata.utils import download_and_extract
 from skdata.utils.image import ImgLoader
 
 
@@ -74,6 +75,36 @@ class BaseFacelike(object):
         # extract it
         if not path.exists(self.home(self.SUBDIR)):
             extract(archive_filename, home, sha1=sha1, verbose=True)
+
+# rishi edit because download_boto is unavailable
+    # def fetch(self, download_if_missing=True):
+    #     """Download and extract the dataset."""
+
+    #     home = self.home()
+
+    #     if not download_if_missing:
+    #         raise IOError("'%s' exists!" % home)
+
+    #     # download archive
+    #     url = self.URL
+    #     sha1 = self.SHA1
+    #     basename = path.basename(url)
+    #     archive_filename = path.join(home, basename)
+    #     if not path.exists(archive_filename):
+    #         if not download_if_missing:
+    #             return
+    #         if not path.exists(home):
+    #             os.makedirs(home)
+    #         download_and_extract(url, home, sha1=sha1, verbose=True)
+    #         # download_boto(url, self.credentials, archive_filename, sha1=sha1)
+
+        # extract it
+        # if not path.exists(self.home(self.SUBDIR)):
+            # extract(archive_filename, home, sha1=sha1, verbose=True)
+
+
+
+
 
     # ------------------------------------------------------------------------
     # -- Dataset Interface: meta

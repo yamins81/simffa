@@ -3,21 +3,24 @@
 """
 import copy
 import cPickle
+from pyll import scope
 
 import pymongo as pm
 import numpy as np
 import scipy.stats as sp_stats
-
-import hyperopt.genson_bandits as gb
-import hyperopt.genson_helpers as gh
+import hyperopt
+import hyperopt.base as gb 
 from thoreano.slm import slm_from_config, FeatureExtractor
+
 from thoreano.classifier import train_scikits
 import skdata.fbo
 from yamutils.stats import pearsonr, spearmanr
 
+from simffa_utils import slm_memmap                                   
+
 import simffa_params
 import simffa_datasets
-import fbo_invariant
+# import fbo_invariant
 
 
 ####################
@@ -25,10 +28,12 @@ import fbo_invariant
 ####################
 
 def get_features(X, config, verbose=False):
-    batchsize = 4
-    slm = slm_from_config(config, X.shape, batchsize=batchsize)
-    extractor = FeatureExtractor(X, slm, batchsize=batchsize, verbose=verbose)
-    features = extractor.compute_features(use_memmap=False)
+    namebase = 'memmap_' + str(np.random.randint(1e8))
+    features = slm_memmap(
+                    desc=config['desc'],
+                    X=X,
+                    basedir=None,
+                    name=namebase + '_img_feat')    
     return features
     
 
@@ -84,9 +89,9 @@ def evaluate_just_FSI(dataset, config, train=False, **training_data):
     return record, FSI
     
 
-    
-    
-def evaluate_FSI(dataset, config, train=True, **training_data):
+@scope.define
+def evaluate_FSI(config, train=True, **training_data):
+    dataset = skdata.fbo.FaceBodyObject20110803()
     X, y = dataset.img_classification_task()
     features = get_features(X, config, verbose=True)
     fs = features.shape
@@ -162,277 +167,316 @@ def evaluate_FSI(dataset, config, train=True, **training_data):
             for stat in STATS:
                 stats[stat] = np.mean([r[1][stat] for r in results])
             record['training_data'][problem] = stats
-    return record, FSI
+    record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
+    record['status'] = 'ok'
+    return record
 
 
-############################
-########Original FBO Bandits
-############################
+## new fbo bandits
+##
 
-class SimffaBandit(gb.GensonBandit):
+@hyperopt.base.as_bandit()
 
-    def __init__(self):
-        super(SimffaBandit, self).__init__(source_string=self.source_string)
+def SimffaL1Bandit():
+    template = simffa_params.l1_params
+    return scope.evaluate_FSI(template)
 
-    @classmethod
-    def evaluate(cls, config, ctrl):
-        dataset = skdata.fbo.FaceBodyObject20110803() 
-        record, FSI = evaluate_FSI(dataset, config)
-        record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
-        print('DONE')
-        return record
+# def SimffaL1GaborBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor)
 
 
-class SimffaL1Bandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l1_params)
+# def SimffaL1GaborLargerBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor_larger)
 
 
-class SimffaL1GaborBandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l1_params_gabor)
+# class SimffaL2Bandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l2_params)
 
 
-class SimffaL1GaborLargerBandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l1_params_gabor_larger)
+# class SimffaL2GaborBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l2_params_gabor)
 
 
-class SimffaL2Bandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l2_params)
+# class SimffaL3Bandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l3_params)
 
 
-class SimffaL2GaborBandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l2_params_gabor)
-
-
-class SimffaL3Bandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l3_params)
-
-
-class SimffaL3GaborBandit(SimffaBandit):
-    source_string = gh.string(simffa_params.l1_params_gabor)
+# class SimffaL3GaborBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor)
 
 
 
-#########################
-########Invariant bandits
-#########################
 
-class SimffaInvariantBandit(gb.GensonBandit):
-    training_data = {}
-    train = True
-    new_backgrounds = False
+
+
+# ############################
+# ########Original FBO Bandits
+# ############################
+
+# class SimffaBandit(gb.Bandit):
+
+#     def __init__(self):
+#         super(SimffaBandit, self).__init__(source_string=self.source_string)
+
+#     @classmethod
+#     def evaluate(cls, config, ctrl):
+#         dataset = skdata.fbo.FaceBodyObject20110803() 
+#         record, FSI = evaluate_FSI(dataset, config)
+#         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
+#         print('DONE')
+#         return record
+
+
+# class SimffaL1Bandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params)
+
+
+# class SimffaL1GaborBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor)
+
+
+# class SimffaL1GaborLargerBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor_larger)
+
+
+# class SimffaL2Bandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l2_params)
+
+
+# class SimffaL2GaborBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l2_params_gabor)
+
+
+# class SimffaL3Bandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l3_params)
+
+
+# class SimffaL3GaborBandit(SimffaBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor)
+
+
+
+# #########################
+# ########Invariant bandits
+# #########################
+
+# class SimffaInvariantBandit(gb.Bandit):
+#     training_data = {}
+#     train = True
+#     new_backgrounds = False
     
-    def __init__(self):
-        super(SimffaInvariantBandit, self).__init__(source_string=self.source_string)
+#     def __init__(self):
+#         super(SimffaInvariantBandit, self).__init__(source_string=self.source_string)
 
-    @classmethod
-    def evaluate(cls, config, ctrl):
-        dataset = skdata.fbo.FaceBodyObject20110803() 
-        original_record, FSI = evaluate_FSI(dataset, config, train=cls.train, **cls.training_data)
-        if cls.new_backgrounds:
-            invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0_b() 
-            invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1_b() 
-            invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2_b() 
-            invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip_b() 
-        else:
-            invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
-            invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
-            invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
-            invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
-        invariant_record0, FSI = evaluate_FSI(invariant_dataset0, config, train=cls.train, **cls.training_data)
-        invariant_record1, FSI = evaluate_FSI(invariant_dataset1, config, train=cls.train, **cls.training_data)
-        invariant_record2, FSI = evaluate_FSI(invariant_dataset2, config, train=cls.train, **cls.training_data)
-        invariant_record_flip, FSI = evaluate_FSI(invariant_dataset_flip, config, train=cls.train, **cls.training_data)            
-        record = {'original': original_record, 
-                  'invariant0': invariant_record0,
-                  'invariant1': invariant_record1,
-                  'invariant2': invariant_record2,
-                  'invariant_flip': invariant_record_flip}
-        Ks = [_x + _y for _y in ['FSI_s_avg', 'Face_selective_s_avg'] for _x in ['','shifted_', 'rectified_']] + \
-             ['F_s_avg', 'BO_s_avg', 'dprime_selective_s_avg','roc_FSI_s_avg', 'roc_Face_selective_s_avg']
-        if hasattr(ctrl, 'attachments'):
-            for k in record:
-                for l in Ks:
-                    spatial_averages = record[k].pop(l)
-                    blob = cPickle.dumps(spatial_averages)
-                    ctrl.attachments['spatial_averages_' + k + '_' + l] = blob
-        if cls.train:
-            record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
-        else:
-            record['loss'] = 1
-        print('DONE')
-        return record
-
-
-class SimffaL1InvariantBandit(SimffaInvariantBandit):
-    training_data = {'num_splits': 3}
-    source_string = gh.string(simffa_params.l1_params)
+#     @classmethod
+#     def evaluate(cls, config, ctrl):
+#         dataset = skdata.fbo.FaceBodyObject20110803() 
+#         original_record, FSI = evaluate_FSI(dataset, config, train=cls.train, **cls.training_data)
+#         if cls.new_backgrounds:
+#             invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0_b() 
+#             invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1_b() 
+#             invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2_b() 
+#             invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip_b() 
+#         else:
+#             invariant_dataset0 = fbo_invariant.FaceBodyObject20110803Invariant0() 
+#             invariant_dataset1 = fbo_invariant.FaceBodyObject20110803Invariant1() 
+#             invariant_dataset2 = fbo_invariant.FaceBodyObject20110803Invariant2() 
+#             invariant_dataset_flip = fbo_invariant.FaceBodyObject20110803InvariantFlip() 
+#         invariant_record0, FSI = evaluate_FSI(invariant_dataset0, config, train=cls.train, **cls.training_data)
+#         invariant_record1, FSI = evaluate_FSI(invariant_dataset1, config, train=cls.train, **cls.training_data)
+#         invariant_record2, FSI = evaluate_FSI(invariant_dataset2, config, train=cls.train, **cls.training_data)
+#         invariant_record_flip, FSI = evaluate_FSI(invariant_dataset_flip, config, train=cls.train, **cls.training_data)            
+#         record = {'original': original_record, 
+#                   'invariant0': invariant_record0,
+#                   'invariant1': invariant_record1,
+#                   'invariant2': invariant_record2,
+#                   'invariant_flip': invariant_record_flip}
+#         Ks = [_x + _y for _y in ['FSI_s_avg', 'Face_selective_s_avg'] for _x in ['','shifted_', 'rectified_']] + \
+#              ['F_s_avg', 'BO_s_avg', 'dprime_selective_s_avg','roc_FSI_s_avg', 'roc_Face_selective_s_avg']
+#         if hasattr(ctrl, 'attachments'):
+#             for k in record:
+#                 for l in Ks:
+#                     spatial_averages = record[k].pop(l)
+#                     blob = cPickle.dumps(spatial_averages)
+#                     ctrl.attachments['spatial_averages_' + k + '_' + l] = blob
+#         if cls.train:
+#             record['loss'] = 1 - (record['invariant1']['training_data']['Face_Nonface']['test_accuracy'])/100.
+#         else:
+#             record['loss'] = 1
+#         print('DONE')
+#         return record
 
 
-class SimffaL2InvariantBandit(SimffaInvariantBandit):
-    source_string = gh.string(simffa_params.l2_params)
+# class SimffaL1InvariantBandit(SimffaInvariantBandit):
+#     training_data = {'num_splits': 3}
+#     source_string = gh.string(simffa_params.l1_params)
 
 
-class SimffaL3InvariantBandit(SimffaInvariantBandit):
-    source_string = gh.string(simffa_params.l3_params)
+# class SimffaL2InvariantBandit(SimffaInvariantBandit):
+#     source_string = gh.string(simffa_params.l2_params)
 
 
-class SimffaPixelsInvariantBandit(SimffaInvariantBandit):
-    source_string = gh.string(simffa_params.pixels_params)
+# class SimffaL3InvariantBandit(SimffaInvariantBandit):
+#     source_string = gh.string(simffa_params.l3_params)
 
 
-class SimffaV1LikeInvariantBandit(SimffaInvariantBandit):
-    training_data = {'num_splits': 3}
-    source_string = gh.string(simffa_params.v1like_params)
+# class SimffaPixelsInvariantBandit(SimffaInvariantBandit):
+#     source_string = gh.string(simffa_params.pixels_params)
+
+
+# class SimffaV1LikeInvariantBandit(SimffaInvariantBandit):
+#     training_data = {'num_splits': 3}
+#     source_string = gh.string(simffa_params.v1like_params)
     
     
-class SimffaV1LikeSpectrumInvariantBandit(SimffaInvariantBandit):
-    training_data = {'num_splits': 3}
-    source_string = gh.string(simffa_params.v1like_spectrum_params)
+# class SimffaV1LikeSpectrumInvariantBandit(SimffaInvariantBandit):
+#     training_data = {'num_splits': 3}
+#     source_string = gh.string(simffa_params.v1like_spectrum_params)
    
     
-class SimffaL1InvariantBanditNew(SimffaInvariantBandit):
-    new_backgrounds = True
-    train = False
-    source_string = gh.string(simffa_params.l1_params)
+# class SimffaL1InvariantBanditNew(SimffaInvariantBandit):
+#     new_backgrounds = True
+#     train = False
+#     source_string = gh.string(simffa_params.l1_params)
 
 
-class SimffaL2InvariantBanditNew(SimffaInvariantBandit):
-    new_backgrounds =True
-    train = False
-    source_string = gh.string(simffa_params.l2_params)
+# class SimffaL2InvariantBanditNew(SimffaInvariantBandit):
+#     new_backgrounds =True
+#     train = False
+#     source_string = gh.string(simffa_params.l2_params)
 
 
-class SimffaL3InvariantBanditNew(SimffaInvariantBandit):
-    new_backgrounds = True
-    train = False
-    source_string = gh.string(simffa_params.l3_params)
+# class SimffaL3InvariantBanditNew(SimffaInvariantBandit):
+#     new_backgrounds = True
+#     train = False
+#     source_string = gh.string(simffa_params.l3_params)
 
 
-class SimffaPixelsInvariantBanditNew(SimffaInvariantBandit):
-    new_backgrounds = True
-    train = False
-    source_string = gh.string(simffa_params.pixels_params)
+# class SimffaPixelsInvariantBanditNew(SimffaInvariantBandit):
+#     new_backgrounds = True
+#     train = False
+#     source_string = gh.string(simffa_params.pixels_params)
 
 
-class SimffaV1LikeSpectrumInvariantBanditNew(SimffaInvariantBandit):
-    new_backgrounds = True
-    train = False
-    source_string = gh.string(simffa_params.v1like_spectrum_params)
+# class SimffaV1LikeSpectrumInvariantBanditNew(SimffaInvariantBandit):
+#     new_backgrounds = True
+#     train = False
+#     source_string = gh.string(simffa_params.v1like_spectrum_params)
 
 
 ########################
 ########Facelike bandits
 ########################
 
-def evaluate_facelike(config, credentials, FSI=None):
-    dataset = simffa_datasets.Facelike(credentials)
-    X, labels = dataset.img_regression_task()
-    all_paths, labels1 = dataset.raw_regression_task()
-    assert (labels == labels1).all()
-    assert (all_paths == sorted(all_paths)).all()
-    features = get_features(X, config, verbose=True)
-    fs = features.shape
-    num_features = fs[1]*fs[2]*fs[3]
-    if FSI is not None:
-        FSI_shape = FSI.shape
-        assert FSI_shape == fs[1:]
-        FSI = np.ravel(FSI)
+# def evaluate_facelike(config, credentials, FSI=None):
+#     dataset = simffa_datasets.Facelike(credentials)
+#     X, labels = dataset.img_regression_task()
+#     all_paths, labels1 = dataset.raw_regression_task()
+#     assert (labels == labels1).all()
+#     assert (all_paths == sorted(all_paths)).all()
+#     features = get_features(X, config, verbose=True)
+#     fs = features.shape
+#     num_features = fs[1]*fs[2]*fs[3]
+#     if FSI is not None:
+#         FSI_shape = FSI.shape
+#         assert FSI_shape == fs[1:]
+#         FSI = np.ravel(FSI)
 
-    record = {}
-    record['num_features'] = num_features
-    record['feature_shape'] = fs
+#     record = {}
+#     record['num_features'] = num_features
+#     record['feature_shape'] = fs
 
-    subjects = [('subject_avg','avg')] # + [('subject_' + str(ind),ind) for ind in range(5)]
+#     subjects = [('subject_avg','avg')] # + [('subject_' + str(ind),ind) for ind in range(5)]
 
-    bins = np.arange(-1, 1, .01)
-    record['bins'] = bins.tolist()
-    for subject, judgement in subjects:
-        record[subject] = {}
-        for name, subset in dataset.SUBSETS + [('all',None)]:
-            print('Evaluating', subject, name)
-            subpaths, sublabels = dataset.raw_regression_task(subset=subset,
-                                                        judgement=judgement)
-            inds = all_paths.searchsorted(subpaths)
-            f_subset = features[inds]
-            label_subset = labels[inds]
-            P, P_prob = pearsonr(f_subset, label_subset)
-            P = np.ma.masked_array(P, np.isnan(P))
+#     bins = np.arange(-1, 1, .01)
+#     record['bins'] = bins.tolist()
+#     for subject, judgement in subjects:
+#         record[subject] = {}
+#         for name, subset in dataset.SUBSETS + [('all',None)]:
+#             print('Evaluating', subject, name)
+#             subpaths, sublabels = dataset.raw_regression_task(subset=subset,
+#                                                         judgement=judgement)
+#             inds = all_paths.searchsorted(subpaths)
+#             f_subset = features[inds]
+#             label_subset = labels[inds]
+#             P, P_prob = pearsonr(f_subset, label_subset)
+#             P = np.ma.masked_array(P, np.isnan(P))
             
-            f_rshp = f_subset.reshape((fs[0],num_features))
-            P_pop, P_pop_prob = sp_stats.pearsonr(f_rshp.mean(1), label_subset)
-            S_pop, S_pop_prob = sp_stats.spearmanr(f_rshp.mean(1), label_subset)
+#             f_rshp = f_subset.reshape((fs[0],num_features))
+#             P_pop, P_pop_prob = sp_stats.pearsonr(f_rshp.mean(1), label_subset)
+#             S_pop, S_pop_prob = sp_stats.spearmanr(f_rshp.mean(1), label_subset)
 
-            data = {}
-            data['Pearson_hist'] = np.histogram(P, bins)[0].tolist()
-            data['Pearson_avg'] = float(P.mean())
-            data['Pearson_s_avg'] = P.mean(2).tolist()
-            data['Pearson_pop_avg'] = float(P_pop)
-            data['Spearman_pop_avg'] = float(S_pop)
+#             data = {}
+#             data['Pearson_hist'] = np.histogram(P, bins)[0].tolist()
+#             data['Pearson_avg'] = float(P.mean())
+#             data['Pearson_s_avg'] = P.mean(2).tolist()
+#             data['Pearson_pop_avg'] = float(P_pop)
+#             data['Spearman_pop_avg'] = float(S_pop)
             
-            if FSI is not None:
-                assert FSI_shape == P.shape == f_subset.shape[1:]
-                sel_inds = (FSI > 1./3)
-                data['Pearson_pop_avg_sel'] = float(sp_stats.pearsonr(f_rshp[sel_inds].mean(1), label_subset))
-                data['Spearman_pop_avg_sel'] = float(sp_stats.spearmanr(f_rshp[sel_inds].mean(1), label_subset))
-                P = P.ravel()
-                sel_inds = np.invert(np.isnan(P))
-                data['Pearson_FSI_corr'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
-                sel_inds = (FSI > 1./3) & np.invert(np.isnan(P))
-                data['Pearson_hist_sel'] = np.histogram(P[sel_inds], bins)[0].tolist()
-                data['Pearson_avg_sel'] = float(P[sel_inds].mean())
-                data['Pearson_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
+#             if FSI is not None:
+#                 assert FSI_shape == P.shape == f_subset.shape[1:]
+#                 sel_inds = (FSI > 1./3)
+#                 data['Pearson_pop_avg_sel'] = float(sp_stats.pearsonr(f_rshp[sel_inds].mean(1), label_subset))
+#                 data['Spearman_pop_avg_sel'] = float(sp_stats.spearmanr(f_rshp[sel_inds].mean(1), label_subset))
+#                 P = P.ravel()
+#                 sel_inds = np.invert(np.isnan(P))
+#                 data['Pearson_FSI_corr'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
+#                 sel_inds = (FSI > 1./3) & np.invert(np.isnan(P))
+#                 data['Pearson_hist_sel'] = np.histogram(P[sel_inds], bins)[0].tolist()
+#                 data['Pearson_avg_sel'] = float(P[sel_inds].mean())
+#                 data['Pearson_FSI_corr_sel'] = np.corrcoef(FSI[sel_inds], P[sel_inds]).tolist()
  
-            record[subject][name] = data
+#             record[subject][name] = data
 
-    return record
-
-
-class SimffaFacelikeBandit(gb.GensonBandit):
-    """
-    call with bandit-argfile supplying credentials
-    """
-    def __init__(self, credentials):
-        super(SimffaFacelikeBandit, self).__init__(source_string=self.source_string)
-        self.credentials = tuple(credentials)
-
-    def evaluate(self, config, ctrl):
-        record = {}
-        dataset = skdata.fbo.FaceBodyObject20110803()
-        FSI_rec, FSI = evaluate_just_FSI(dataset, config, train=False)
-        record['FSI'] = FSI_rec
-        record['Facelike'] = evaluate_facelike(config, self.credentials, FSI=FSI)
-        record['loss'] = .5 * (1 - record['Facelike']['subject_avg']['all']['Pearson_avg'])
-        print('DONE')
-
-        return record
+#     return record
 
 
-class SimffaFacelikeL1Bandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l1_params)
+# class SimffaFacelikeBandit(gb.Bandit):
+#     """
+#     call with bandit-argfile supplying credentials
+#     """
+#     def __init__(self, credentials):
+#         super(SimffaFacelikeBandit, self).__init__(source_string=self.source_string)
+#         self.credentials = tuple(credentials)
+
+#     def evaluate(self, config, ctrl):
+#         record = {}
+#         dataset = skdata.fbo.FaceBodyObject20110803()
+#         FSI_rec, FSI = evaluate_just_FSI(dataset, config, train=False)
+#         record['FSI'] = FSI_rec
+#         record['Facelike'] = evaluate_facelike(config, self.credentials, FSI=FSI)
+#         record['loss'] = .5 * (1 - record['Facelike']['subject_avg']['all']['Pearson_avg'])
+#         print('DONE')
+
+#         return record
 
 
-class SimffaFacelikeL2Bandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l2_params)
+# class SimffaFacelikeL1Bandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l1_params)
 
 
-class SimffaFacelikeL3Bandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l3_params)
+# class SimffaFacelikeL2Bandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l2_params)
 
 
-class SimffaFacelikeL1GaborBandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l1_params_gabor)
+# class SimffaFacelikeL3Bandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l3_params)
 
 
-class SimffaFacelikeL1GaborLargerBandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l1_params_gabor_larger)
+# class SimffaFacelikeL1GaborBandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor)
 
 
-class SimffaFacelikeL2GaborBandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l2_params_gabor)
+# class SimffaFacelikeL1GaborLargerBandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor_larger)
 
 
-class SimffaFacelikeL3GaborBandit(SimffaFacelikeBandit):
-    source_string = gh.string(simffa_params.l1_params_gabor)
+# class SimffaFacelikeL2GaborBandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l2_params_gabor)
+
+
+# class SimffaFacelikeL3GaborBandit(SimffaFacelikeBandit):
+#     source_string = gh.string(simffa_params.l1_params_gabor)
 
 
                             
