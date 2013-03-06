@@ -13,9 +13,10 @@ import hyperopt
 import hyperopt.base as gb 
 from thoreano.slm import slm_from_config, FeatureExtractor
 
-from simffa_classifier import train_scikits
+# from simffa_classifier import train_scikits
+from dldata_classifier import train_scikits
 
-import simffa_pldat as pldat
+import simffa_mtDat as mtdat
 import simffa_fboDat as fbo
 from yamutils.stats import pearsonr, spearmanr
 
@@ -88,7 +89,7 @@ def regression_traintest(dataset, features, labels, seed=0, ntrain=80, ntest=30,
     rsq = rsq / num_splits
     return results, rsq
     
-def regression_trainingError(dataset, features, labels):
+def regression_trainingError(features, labels):
 
     fs = features.shape
     if np.array(fs).shape[0] == 4:
@@ -140,7 +141,7 @@ def regression_trainingError(dataset, features, labels):
 @scope.define
 def evaluate_psyFace(config=None, features=None, labels=None, train=True, **training_data):
     if features is None:
-        dataset = pldat.PLData_Feb222013()
+        dataset = mtdat.MTData_Feb222013()
         imgs, labels = dataset.img_classification_task()
         features = get_features(imgs, config, verbose=False)
 

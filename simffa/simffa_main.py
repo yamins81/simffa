@@ -119,18 +119,22 @@ def plotPopulationResults(model_prop, model_param):
 	plt.title(str(np.corrcoef(y[y<40],z[y<40])[0][1]))	
 	plt.savefig(fname_tag + '_peak.png')
 
+# def plotSummary(model_prop):
+# 	[i[0] for i in sorted(enumerate(prop[:,1]), key=lambda x:x[1])]
+	
+
 def main():
 	nInvar = 0;
 	imgs, labels, dataset = initMT(nInvar)
 	Nim = labels.shape[0]
 
-	params = sp.l3_params
-	Nmodels = 1
+	params = sp.l1_params
+	Nmodels = 20
 	overwrite = False
 	global basedir 
 
 	pop_outname = params['tag'] + 'model_' + str(Nim) + '_pop.h5'
-	basedir = params['tag']  + 'model_' + str(Nim) + 'TEST/'
+	basedir = params['tag']  + 'model_' + str(Nim) + '/'
 	os.mkdir(basedir)
 
 	model_prop = sampleModels(params, Nmodels, imgs, labels, dataset, overwrite)
