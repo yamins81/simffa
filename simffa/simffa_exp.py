@@ -8,8 +8,9 @@ from hyperopt.mongoexp import MongoTrials
 
 def get_experiment(dbname, host, port, bandit):
 	port = int(port)
-	trials = MongoTrials('mongo://%s:%d/%s/jobs' % (host, port, dbname), refresh=False)
-	algo = []
+	ekey = 'simffa.simffa_bandit.SimffaL1Bandit/hyperopt.theano_bandit_algos.TheanoRandom'
+	trials = MongoTrials('mongo://%s:%d/%s/jobs' % (host, port, dbname), refresh=False, exp_key=ekey)
+	algo = hyperopt.theano_bandit_algos.TheanoRandom
 	exp = hyperopt.Experiment(trials, algo, poll_interval_secs=.1)
 	return exp
 

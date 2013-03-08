@@ -37,6 +37,25 @@ def getPearsonCorr(X,Y):
 	R1 = R.reshape(fs[1], fs[2], fs[3])
 	return R1
 
+# distance in anatomical space must be correlated to distance in feature space
+def getTopographicOrg(X):
+	X = np.array(X) 
+	fs = X.shape
+	num_pairs = 10000
+	AF_dist = []
+	for i in range(num_pairs):
+		i1 = np.random.randint(fs[0])
+		j1 = np.random.randint(fs[1])
+		i2 = np.random.randint(fs[0])
+		j2 = np.random.randint(fs[1])
+		aDist = np.sqrt((i1-i2)**2 +  (j1-j2)**2)
+		fDist = abs(X[i1,j1] - X[i2,j2])
+		AF_dist.append([aDist, fDist])
+	AF_dist = np.array(AF_dist)
+	r,p = pearsonr(AF_dist[:,1], AF_dist[:,0])
+	r = -r
+	return r
+
 def getClusterSize(X):
 	X = np.array(X) #+ 1 # make sure all are positive
 	fs = X.shape
@@ -80,13 +99,14 @@ def testAsymmetryIndex():
 			n = np.array([[np.random.random() for i in range(50)] for j in range(50)])
 
 		# width = np.int(getClusterSize(n))
-		width = getBlobiness(n)
+		# width = getBlobiness(n)
+		width = getTopographicOrg(n)
 
 		plt.subplot(2,5,ii+1)
 		plt.imshow(n)
 		plt.title('{:.4}'.format(width))
 	
-	plt.savefig('fig/peak_test.png')
+	plt.savefig('fig/topog_test.png')
 
 def testCorr():
 	N = 100;
@@ -102,6 +122,4 @@ def testCorr():
 	print R2
 	return R1, R2
 
-# R1,R2 = testCorr()
-
-testAsymmetryIndex()
+# testAsymmetryIndex()
