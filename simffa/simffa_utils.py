@@ -17,14 +17,15 @@ def slm_memmap(desc, X, name, basedir=None, test=None):
     rval = larray.cache_memmap(feat, name, basedir=basedir)
     return rval
 
-def slm_h5(desc, X, name, basedir=None, test=None):
+def slm_h5(desc, X, name, basedir=None, save=True):
 
     if basedir is None:
         basedir = os.getcwd()
     feat_fn = SLMFunction(desc, X.shape[1:])
     feat = larray.lmap(feat_fn, X)
     feat = np.array(feat)
-    h5file = tbl.openFile(basedir + name + '.h5', mode = "a", title = "model data")
-    h5file.createArray(h5file.root, 'features', feat)
-    h5file.close()
+    if save:
+        h5file = tbl.openFile(basedir + name + '.h5', mode = "a", title = "model data")
+        h5file.createArray(h5file.root, 'features', feat)
+        h5file.close()
     return feat

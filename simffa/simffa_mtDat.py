@@ -13,6 +13,7 @@ from glob import glob
 import hashlib
 
 import numpy as np
+import tabular as tb
 import Image
 import random
 import skdata as skd
@@ -42,7 +43,6 @@ class MTData(object):
         self.ntrain = ntrain
         self.ntest = ntest
         self.num_splits = num_splits
-        self.names = ['Face','Body','Object']
 
         if meta is not None:
             self._meta = meta
@@ -50,8 +50,9 @@ class MTData(object):
         self.name = self.__class__.__name__
   
     @property
-    def meta(self):
+    def meta(self):            
         if not hasattr(self, '_meta'):
+            self.fetch(download_if_missing=True)
             self._meta = self._get_meta()
         return self._meta
 
@@ -63,9 +64,19 @@ class MTData(object):
         f.close()
         img_filenames = np.array(img_filenames)
         
-        # all psychophysical labels
-        f = open(self.LABEL_fn, 'r')
-        label_data  = [[np.double(x) for x in line.split()] for line in f]
+        # all psychophysical labels - face
+        f = open(self.LABEL1_fn, 'r')
+        label_data1  = [[np.double(x) for x in line.split()] for line in f]
+        f.close()
+
+        # all psychophysical labels - eye
+        f = open(self.LABEL2_fn, 'r')
+        label_data2  = [[np.double(x) for x in line.split()] for line in f]
+        f.close()
+
+        # all psychophysical labels - nose
+        f = open(self.LABEL3_fn, 'r')
+        label_data3  = [[np.double(x) for x in line.split()] for line in f]
         f.close()
 
         # indices of images of interest 
@@ -75,24 +86,54 @@ class MTData(object):
         img_oi = np.double(img_oi)
 
         meta = []
-
+        metanames = ['filename', 'id', 'faceLabel', 'eyeLabel', 'noseLabel', 'hash']
         s_im = img_oi.shape
         maxImgs = 1000
         nIm = min(maxImgs, s_im[0])
         for i in range(nIm):
             ind = np.int(img_oi[i])
             img_filename = img_filenames[ind-1][0]
-            name = label_data[ind-1][1]
+            label1 = label_data1[ind-1][1]
+            label2 = label_data2[ind-1][1]
+            label3 = label_data3[ind-1][1]
+
             img_data = open(img_filename, 'rb').read()
             sha1 = hashlib.sha1(img_data).hexdigest()
 
-            data = dict(name=name,
+            data = dict(filename=img_filename,
                         id=ind,
-                        filename=img_filename,
+                        label1=label1,
+                        label2=label2,
+                        label3=label3,
                         sha1=sha1)
             meta += [data]
 
+        # meta = tb.tabarray(records=meta, names=metanames)
         return meta
+
+    def fetch(self, download_if_missing=True):
+        """Download and extract the dataset."""
+
+        home = self.home()
+
+        if not download_if_missing:
+            raise IOError("'%s' exists!" % home)
+
+        # download archive
+        url = self.URL
+        sha1 = self.SHA1
+        basename = path.basename(url)
+        archive_filename = path.join(home, basename)
+        if not path.exists(archive_filename):
+            if not download_if_missing:
+                return
+            if not path.exists(home):
+                os.makedirs(home)
+            download(url, archive_filename, sha1=sha1)
+
+        # extract it
+        if not path.exists(self.home(self.SUBDIR)):
+            extract(archive_filename, home, sha1=sha1, verbose=True)
 
     @property
     def splits(self):
@@ -165,26 +206,32 @@ class MTData(object):
     # -- Standard Tasks
     # ------------------------------------------------------------------------
 
-    def raw_classification_task(self, split=None):
-        """Return image_paths, labels"""
-        if split:
-            inds = self.splits[split]
-        else:
-            inds = xrange(len(self.meta))
+    # def raw_classification_task(self, split=None):
+    #     """Return image_paths, labels"""
+    #     if split:
+    #         inds = self.splits[split]
+    #     else:
+    #         inds = xrange(len(self.meta))
+    #     image_paths = [self.meta[ind]['filename'] for ind in inds]
+    #     names = np.asarray([self.meta[ind]['name'] for ind in inds])
+    #     # labels = int_labels(names)
+    #     labels = names
+    #     return image_paths, labels
+
+    # def img_classification_task(self, dtype='uint8', split=None):
+    #     img_paths, labels = self.raw_classification_task(split=split)
+    #     imgs = skd.larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype=dtype, mode='L'),
+    #                        img_paths)
+    #     return imgs, labels
+
+    def get_images(self, num_reps):
+        tmp = np.array(self.meta)
+        inds = range(tmp.shape[0])
         image_paths = [self.meta[ind]['filename'] for ind in inds]
-        names = np.asarray([self.meta[ind]['name'] for ind in inds])
-        # labels = int_labels(names)
-        labels = names
-        return image_paths, labels
+        imgs = skd.larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype='uint8', mode='L'),
+                           image_paths)
+        labels = np.asarray([self.meta[ind]['label1'] for ind in inds])
 
-    def img_classification_task(self, dtype='uint8', split=None):
-        img_paths, labels = self.raw_classification_task(split=split)
-        imgs = skd.larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype=dtype, mode='L'),
-                           img_paths)
-        return imgs, labels
-
-    def invariant_img_classification_task(self, num_reps):
-        imgs, labels = self.img_classification_task()
         IMGS = np.array(imgs).tolist()
         LABELS = labels.tolist()
         
@@ -208,9 +255,23 @@ class MTData_Feb222013(MTData):
     SHA1 = '088387e08ac008a0b8326e7dec1f0a667c8b71d0'
     SUBDIR = 'DAT_mt'
     IMG_fn = 'img_all.txt'
-    LABEL_fn = 'psyFaceMag_20121012_210.txt'
+    LABEL1_fn = 'psyFaceMag_20121012_210.txt'
+    LABEL2_fn = 'psyEyeMag_20121228_285.txt'
+    LABEL3_fn = 'psyNoseMag_20130201_285.txt'
     # IMG_OI_fn = 'img_oi818.txt'
     IMG_OI_fn = 'img_oi408.txt'
+
+class MTData_March082013(MTData):
+    URL = 'http://dicarlocox-datasets.s3.amazonaws.com/simffa_dat.zip'
+    SHA1 = '1cb9e893d7a582040aef898d00f3d370bf274efe'
+    SUBDIR = './'
+    IMG_fn = 'img_all.txt'
+    LABEL1_fn = 'psyFaceMag_20121012_210.txt'
+    LABEL2_fn = 'psyEyeMag_20121228_285.txt'
+    LABEL3_fn = 'psyNoseMag_20130201_285.txt'
+    # IMG_OI_fn = 'img_oi818.txt'
+    IMG_OI_fn = 'img_oi408.txt'
+
 
 
 

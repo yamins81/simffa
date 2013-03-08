@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 # load MTurk image data - with nInvar number of invariant reps
 def initMT(nInvar=0):
 	dataset = mtdat.MTData_Feb222013()
-	imgs,labels = dataset.invariant_img_classification_task(nInvar)
+	imgs,labels = dataset.get_images(nInvar)
 	N = labels.shape
 	print 'Loading ' + str(N[0]) + ' images.'
 	return imgs, labels, dataset
