@@ -98,7 +98,7 @@ def regression_trainingError(features, labels):
     results = []
     rsq = 0;
     XY = (features, labels)
-    result = train_scikits(XY, XY, 'linear_model.LassoCV', regression=True)
+    result = train_scikits(XY, XY, 'linear_model.RidgeCV', regression=True)
     rsq = result[1]['test_rsquared']
     return result, rsq
 

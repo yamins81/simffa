@@ -47,6 +47,7 @@ def getClusterSize(X):
 	return clusterSize
 
 def getBlobiness(x):
+	x = x[~np.isnan(x)]
 	x0 = np.abs(x - x.mean()) + sys.float_info.epsilon
 	y = -np.log(x0/len(x.ravel())).mean()
 	return y
