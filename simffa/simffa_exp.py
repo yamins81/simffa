@@ -37,7 +37,7 @@ def suggest_multiple_from_name(dbname, host, port, bandit_algo_names, bandit_nam
 
 
 def startExp_main():
-	dnname = 'simffa'
+	dbname = 'simffa'
 	exp_keys = ['SimffaL1BanditRandom', 'SimffaL2BanditRandom', 'SimffaL3BanditRandom']
 	host = 'localhost'
 	port = 22334
