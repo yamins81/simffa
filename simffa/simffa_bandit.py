@@ -32,49 +32,49 @@ def SimffaL1Bandit():
     template = sp.l1_params
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
-def SimffaL1GaborBandit(SimffaBandit):
+def SimffaL1GaborBandit():
     template = sp.l1_params_gabor
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
-def SimffaL1GaborLargerBandit(SimffaBandit):
+def SimffaL1GaborLargerBandit():
     template = sp.l1_params_gabor_larger
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
-def SimffaL2Bandit(SimffaBandit):
+def SimffaL2Bandit():
     template = sp.l2_params
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
-def SimffaL2GaborBandit(SimffaBandit):
+def SimffaL2GaborBandit():
     template = sp.l2_params_gabor
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
-def SimffaL3Bandit(SimffaBandit):
+def SimffaL3Bandit():
     template = sp.l3_params
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
-def SimffaL3GaborBandit(SimffaBandit):
+def SimffaL3GaborBandit():
     template = sp.l3_params_gabor
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images()
-    return scope.bandit_evaluatePsyFace(template, features=None, imgs, labels)
+    return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 ####################
 ########Common stuff
@@ -89,38 +89,32 @@ def get_features(X, config, verbose=False, dirname=None, fname_tag=None):
                     save=False) 
     return features
     
+def get_regression_splits(labels, seed, ntrain, ntest, num_splits):
+        nIm = np.array(labels).shape[0]
+        rng = np.random.RandomState(seed)
+        splits = {}
+        for split_id in range(num_splits):
+            splits['train_' + str(split_id)] = []
+            splits['test_' + str(split_id)] = []
+            
+            perm = rng.permutation(nIm)
+            for ind in perm[:ntrain]:
+                splits['train_' + str(split_id)].append(ind)
+            for ind in perm[ntrain: ntrain + ntest]:
+                splits['test_' + str(split_id)].append(ind)
 
-# def traintest(dataset, features, seed=0, ntrain=10, ntest=10, num_splits=5, catfunc=None):
-#     if catfunc is None:
-#         catfunc = lambda x : x['name']
-#     Xr = np.array([m['filename'] for m in dataset.meta])
-#     labels = np.array([catfunc(m) for m in dataset.meta])
-#     labelset = set(labels)
-#     splits = dataset.generate_splits(seed, ntrain, ntest, num_splits, labelset=labelset, catfunc=catfunc)
-#     results = []
-#     for ind in range(num_splits):
-#         train_split = np.array(splits['train_' + str(ind)])
-#         test_split = np.array(splits['test_' + str(ind)])
-#         train_inds = np.searchsorted(Xr,train_split)
-#         test_inds = np.searchsorted(Xr,test_split)
-#         train_X = features[train_inds]
-#         test_X = features[test_inds]
-#         train_y = labels[train_inds]
-#         test_y = labels[test_inds]
-#         train_Xy = (train_X, train_y)
-#         test_Xy = (test_X, test_y)
-#         result = train_scikits(train_Xy, test_Xy, 'liblinear', regression=False)
-#         results.append(result)
-#     return results
+        return splits
 
+def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_splits=5):
 
-def regression_traintest(dataset, features, labels, seed=0, ntrain=80, ntest=30, num_splits=5):
-
+    features = np.array(features)
+    labels = np.array(labels)
     fs = features.shape
     if np.array(fs).shape[0] == 4:
         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
 
-    splits = dataset.generate_regression_splits(labels, seed, ntrain, ntest, num_splits)
+    splits = get_regression_splits(labels, seed, ntrain, ntest, num_splits)
+    # splits = dataset.generate_regression_splits(labels, seed, ntrain, ntest, num_splits)
     results = []
     rsq = 0;
     for ind in range(num_splits):
@@ -157,7 +151,7 @@ def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
 
     record = {}
     record['spec'] = config
-    record['features_data'] = features
+    # record['features_data'] = features
     record['num_features'] = num_features
     record['feature_shape'] = fs
 
@@ -169,7 +163,7 @@ def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
     hist_n, hist_x = np.histogram(nonnanCorr, bins=50)
 
     num_splits = 10
-    psyRegress = regression_traintest(dataset, features, labels, seed=0, ntrain=80, ntest=30, num_splits)
+    psyRegress = regression_traintest(dataset, features, labels, 0, 80, 40, num_splits)
     psy_rsq = [psyRegress[i][1]['test_rsquared'] for i in range(num_splits)]
     psy_rsq_mu = np.array(psy_rsq).mean(0)
 
@@ -179,6 +173,7 @@ def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
     results['psyCorr_mu'] = np.abs(result['psyCorr_mu']).ravel().mean(0)
     results['psyCorr_cluster'] = sanal.getClusterSize(psyCorr)/(fs[1]*fs[2])
     results['psyCorr_blob'] = sanal.getBlobiness(psyCorr)
+    results['psyCorr_topog'] = sanal.getTopographicOrg(psyCorr)
     results['psyRegress'] = psy_rsq_mu
 
     record['results'] = results

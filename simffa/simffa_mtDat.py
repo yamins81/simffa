@@ -269,8 +269,8 @@ class MTData_March082013(MTData):
     LABEL1_fn = 'psyFaceMag_20121012_210.txt'
     LABEL2_fn = 'psyEyeMag_20121228_285.txt'
     LABEL3_fn = 'psyNoseMag_20130201_285.txt'
-    # IMG_OI_fn = 'img_oi818.txt'
-    IMG_OI_fn = 'img_oi408.txt'
+    IMG_OI_fn = 'img_oi818.txt'
+    # IMG_OI_fn = 'img_oi408.txt'
 
 
 
