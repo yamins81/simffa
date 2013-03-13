@@ -31,49 +31,49 @@ import simffa_analysisFns as sanal
 def SimffaL1Bandit():
     template = sp.l1_params
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
 def SimffaL1GaborBandit():
     template = sp.l1_params_gabor
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
 def SimffaL1GaborLargerBandit():
     template = sp.l1_params_gabor_larger
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
 def SimffaL2Bandit():
     template = sp.l2_params
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
 def SimffaL2GaborBandit():
     template = sp.l2_params_gabor
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
 def SimffaL3Bandit():
     template = sp.l3_params
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 @hyperopt.base.as_bandit()
 def SimffaL3GaborBandit():
     template = sp.l3_params_gabor
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images()
+    imgs,labels = dataset.get_images(0)
     return scope.bandit_evaluatePsyFace(template, None, imgs, labels)
 
 ####################

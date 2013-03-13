@@ -111,10 +111,14 @@ class MTData(object):
         # meta = tb.tabarray(records=meta, names=metanames)
         return meta
 
+    def home(self, *suffix_paths):
+        return path.join('.', *suffix_paths)
+
     def fetch(self, download_if_missing=True):
         """Download and extract the dataset."""
 
-        home = self.home()
+        # home = self.home()
+        home = '.'
 
         if not download_if_missing:
             raise IOError("'%s' exists!" % home)
