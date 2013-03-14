@@ -57,30 +57,30 @@ class MTData(object):
         return self._meta
 
     def _get_meta(self):
-
+        home = self.home()
         # all image filenames
-        f = open(self.IMG_fn, 'r')
+        f = open(path.join(home, self.IMG_fn), 'r')
         img_filenames = [[x for x in line.split()] for line in f]
         f.close()
         img_filenames = np.array(img_filenames)
         
         # all psychophysical labels - face
-        f = open(self.LABEL1_fn, 'r')
+        f = open(path.join(home, self.LABEL1_fn), 'r')
         label_data1  = [[np.double(x) for x in line.split()] for line in f]
         f.close()
 
         # all psychophysical labels - eye
-        f = open(self.LABEL2_fn, 'r')
+        f = open(path.join(home, self.LABEL2_fn), 'r')
         label_data2  = [[np.double(x) for x in line.split()] for line in f]
         f.close()
 
         # all psychophysical labels - nose
-        f = open(self.LABEL3_fn, 'r')
+        f = open(path.join(home, self.LABEL3_fn), 'r')
         label_data3  = [[np.double(x) for x in line.split()] for line in f]
         f.close()
 
         # indices of images of interest 
-        f = open(self.IMG_OI_fn, 'r')
+        f = open(path.join(home, self.IMG_OI_fn), 'r')
         img_oi  = [[int(x) for x in line.split()] for line in f]
         f.close()
         img_oi = np.double(img_oi)
@@ -96,11 +96,11 @@ class MTData(object):
             label1 = label_data1[ind-1][1]
             label2 = label_data2[ind-1][1]
             label3 = label_data3[ind-1][1]
-
-            img_data = open(img_filename, 'rb').read()
+            img_fn = path.join(home, img_filename)
+            img_data = open(img_fn, 'rb').read()
             sha1 = hashlib.sha1(img_data).hexdigest()
 
-            data = dict(filename=img_filename,
+            data = dict(filename=img_fn,
                         id=ind,
                         label1=label1,
                         label2=label2,
@@ -267,7 +267,7 @@ class MTData_Feb222013(MTData):
 class MTData_March082013(MTData):
     URL = 'http://dicarlocox-datasets.s3.amazonaws.com/simffa_dat.zip'
     SHA1 = '1cb9e893d7a582040aef898d00f3d370bf274efe'
-    SUBDIR = './'
+    SUBDIR = 'DAT_mt'
     IMG_fn = 'img_all.txt'
     LABEL1_fn = 'psyFaceMag_20121012_210.txt'
     LABEL2_fn = 'psyEyeMag_20121228_285.txt'
