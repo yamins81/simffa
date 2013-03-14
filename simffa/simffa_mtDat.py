@@ -112,13 +112,12 @@ class MTData(object):
         return meta
 
     def home(self, *suffix_paths):
-        return path.join('.', *suffix_paths)
+        return path.join('/home/data/', *suffix_paths)
 
     def fetch(self, download_if_missing=True):
         """Download and extract the dataset."""
 
-        # home = self.home()
-        home = '.'
+        home = self.home()
 
         if not download_if_missing:
             raise IOError("'%s' exists!" % home)
