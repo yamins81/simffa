@@ -52,6 +52,9 @@ def startExp_main():
 	bandit_algo_names = ['hyperopt.Random', 'hyperopt.Random', 'hyperopt.Random']
 	bandit_names = ['simffa_bandit.SimffaL1Bandit', 'simffa_bandit.SimffaL2Bandit', 'simffa_bandit.SimffaL3Bandit']
 	N = 100
+	# exp = suggest_multiple_from_name(dbname, host, port, bandit_algo_names, bandit_names, exp_keys, N)
+	# return exp
 	suggest_multiple_from_name(dbname, host, port, bandit_algo_names, bandit_names, exp_keys, N)
 
-# startExp_main()
+startExp_main()
+
