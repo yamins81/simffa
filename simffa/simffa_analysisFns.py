@@ -9,8 +9,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 def getPearsonCorr2D(X,Y):
-	X = np.array(X)
-	Y = np.array(Y)
+	# X = np.array(X)
+	# Y = np.array(Y)
 	fs = X.shape
 	num_feats = fs[1]*fs[2]
 

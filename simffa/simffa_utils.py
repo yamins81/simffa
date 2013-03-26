@@ -21,9 +21,13 @@ def slm_h5(desc, X, name, basedir=None, save=True):
 
     if basedir is None:
         basedir = os.getcwd()
+    print 'in slm_h5 - pre'
     feat_fn = SLMFunction(desc, X.shape[1:])
+    print 'in slm_h5 - post'
     feat = larray.lmap(feat_fn, X)
-    feat = np.array(feat)
+    print 'in slm_h5 - post2'
+    # feat = np.array(feat)
+    # print 'in slm_h5 post 3'
     if save:
         h5file = tbl.openFile(basedir + name + '.h5', mode = "a", title = "model data")
         h5file.createArray(h5file.root, 'features', feat)
