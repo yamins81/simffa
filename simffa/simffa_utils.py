@@ -2,7 +2,7 @@ import os
 from thoreano.slm import SLMFunction
 from skdata import larray
 import numpy as np
-import tables as tbl
+# import tables as tbl
 
 def slm_memmap(desc, X, name, basedir=None, test=None):
     """
@@ -17,17 +17,14 @@ def slm_memmap(desc, X, name, basedir=None, test=None):
     rval = larray.cache_memmap(feat, name, basedir=basedir)
     return rval
 
-def slm_h5(desc, X, name, basedir=None, save=True):
+def slm_h5(desc, X, name, basedir=None, save=False):
 
     if basedir is None:
         basedir = os.getcwd()
-    print 'in slm_h5 - pre'
+    
     feat_fn = SLMFunction(desc, X.shape[1:])
-    print 'in slm_h5 - post'
     feat = larray.lmap(feat_fn, X)
-    print 'in slm_h5 - post2'
-    # feat = np.array(feat)
-    # print 'in slm_h5 post 3'
+    
     if save:
         h5file = tbl.openFile(basedir + name + '.h5', mode = "a", title = "model data")
         h5file.createArray(h5file.root, 'features', feat)

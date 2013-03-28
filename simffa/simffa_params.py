@@ -153,8 +153,17 @@ l1_params = {'desc': [
             [('fbcorr', filter1r),
              ('activ', activ1),
              ('lpool', lpool1r),
+             ('rescale', rescale1),
              ('lnorm', lnorm1r)],
            ]}
+
+#rishi edit
+# l1_params = {'desc': [
+#             [('fbcorr', filter1r),
+#              ('activ', activ1),
+#              ('lpool', lpool1r),
+#              ('lnorm', lnorm1r)],
+#            ]}
 
 
 l2_params = {'desc': [[('lnorm', lnorm0)],

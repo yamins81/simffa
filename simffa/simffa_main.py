@@ -185,6 +185,7 @@ def main():
 	Nim = labels.shape[0]
 
 	params = sp.l1_params
+	# conf = stochastic.sample(model_param, np.random.RandomState(i))
 	Nmodels = 20
 	overwrite = False
 	global basedir 

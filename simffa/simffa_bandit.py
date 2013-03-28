@@ -127,33 +127,31 @@ def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_spli
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
         result = train_scikits(train_Xy, test_Xy, 'linear_model.RidgeCV', regression=True)
-        results.append(result)
+        rsq = rsq+result[1]['test_rsquared']
+        # results.append(result)
+    rsq = rsq / num_splits
 
-    return results
+    return rsq
     
 def regression_trainingError(features, labels):
-    rsq = 0;
+    fs = features.shape
+    if np.array(fs).shape[0] == 4:
+        features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
     XY = (features, labels)
     result = train_scikits(XY, XY, 'linear_model.RidgeCV', regression=True)
     rsq = result[1]['test_rsquared']
-    return result, rsq
+    return rsq
 
 @scope.define
 def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
     if features is None:
         dataset = mtdat.MTData_March082013()
-        imgs,labels = dataset.get_images(0)
+        imgs,labels = dataset.get_images()
+        nIm = labels.shape[0]
+        print 'Loading ' + str(nIm) + 'imgs..'
         features = get_features(imgs, config, verbose=False)
-        # print features.shape
 
-    print 'remap to numpy array'
     features = np.array(features)
-
-    print 'feature shape : '
-    print features.shape
-
-    print 'labels shape : '
-    print labels.shape
     # features = features[:]
 
     fs = features.shape
@@ -164,24 +162,19 @@ def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
     record['num_features'] = num_features
     record['feature_shape'] = fs
 
-    # print 'computing regression error'
-    # num_splits = 5
-    # psyRegress = regression_traintest(features, labels, 0, 80, 40, num_splits)
-    # psy_rsq = [psyRegress[i][1]['test_rsquared'] for i in range(num_splits)]
-    # psy_rsq_mu = np.array(psy_rsq).mean(0)
-    psy_rsq_mu = 0.5
-
-    print 'computing stats'
-    results = {}
+    print 'computing regression error'
+    num_splits = 4
+    num_train = np.floor(0.75*nIm)
+    num_test = np.floor(0.10*nIm)
+    seed = np.random.randint(num_splits)
+    psy_rsq_mu = regression_traintest(features, labels, seed, num_train, num_test, num_splits)
+    
     features = features.mean(3)
-    # features = features.mean(3)
     print 'computed map'
     psyCorr = sanal.getPearsonCorr2D(features, labels)
     nonnanCorr = np.array(psyCorr).ravel()
     nonnanCorr = nonnanCorr[~np.isnan(nonnanCorr)]
     hist_n, hist_x = np.histogram(nonnanCorr, bins=50)
-
-    
 
     print 'storing stats'
     results = {}
@@ -193,7 +186,7 @@ def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
     results['psyCorr_blob'] = sanal.getBlobiness(psyCorr)
     results['psyCorr_topog'] = sanal.getTopographicOrg(psyCorr)
     results['psyRegress'] = psy_rsq_mu
-
+    
     record['results'] = results
     record['attachments'] = {}
     record['loss'] = 1 - psy_rsq_mu

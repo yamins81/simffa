@@ -17,6 +17,7 @@ import tabular as tb
 import Image
 import random
 import skdata as skd
+from skdata import larray
 from skdata.utils import download, extract, int_labels
 from skdata.utils.image import ImgLoader
 
@@ -88,7 +89,8 @@ class MTData(object):
         meta = []
         metanames = ['filename', 'id', 'faceLabel', 'eyeLabel', 'noseLabel', 'hash']
         s_im = img_oi.shape
-        maxImgs = 1000
+        # maxImgs = 1000
+        maxImgs = 50
         nIm = min(maxImgs, s_im[0])
         for i in range(nIm):
             ind = np.int(img_oi[i])
@@ -107,6 +109,20 @@ class MTData(object):
                         label3=label3,
                         sha1=sha1)
             meta += [data]
+
+            # translated images ("invariant" dataset)
+            for i in range(2):
+                new_tag = '_i'+str(i+1)+'.png'
+                invar_fn = img_fn.replace('.png', new_tag)
+                img_data = open(invar_fn, 'rb').read()
+                sha1 = hashlib.sha1(img_data).hexdigest()
+                data2 = dict(filename=invar_fn,
+                            id=ind,
+                            label1=label1,
+                            label2=label2,
+                            label3=label3,
+                            sha1=sha1)
+                meta += [data2]
 
         # meta = tb.tabarray(records=meta, names=metanames)
         return meta
@@ -205,51 +221,30 @@ class MTData(object):
         if path.isdir(self.home()):
             shutil.rmtree(self.home())
 
-    # ------------------------------------------------------------------------
-    # -- Standard Tasks
-    # ------------------------------------------------------------------------
 
-    # def raw_classification_task(self, split=None):
-    #     """Return image_paths, labels"""
-    #     if split:
-    #         inds = self.splits[split]
-    #     else:
-    #         inds = xrange(len(self.meta))
-    #     image_paths = [self.meta[ind]['filename'] for ind in inds]
-    #     names = np.asarray([self.meta[ind]['name'] for ind in inds])
-    #     # labels = int_labels(names)
-    #     labels = names
-    #     return image_paths, labels
-
-    # def img_classification_task(self, dtype='uint8', split=None):
-    #     img_paths, labels = self.raw_classification_task(split=split)
-    #     imgs = skd.larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype=dtype, mode='L'),
-    #                        img_paths)
-    #     return imgs, labels
-
-    def get_images(self, num_reps):
+    def get_images(self, label_id='label1'):
         tmp = np.array(self.meta)
         inds = range(tmp.shape[0])
         image_paths = [self.meta[ind]['filename'] for ind in inds]
-        imgs = skd.larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype='uint8', mode='L'),
+        imgs = larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype='uint8', mode='L'),
                            image_paths)
-        labels = np.asarray([self.meta[ind]['label1'] for ind in inds])
-
-        IMGS = np.array(imgs).tolist()
-        LABELS = labels.tolist()
+        labels = np.asarray([self.meta[ind][label_id] for ind in inds])
+    
+        IMGS = np.array(imgs)
+        LABELS = np.array(labels)
         
-        fs = imgs.shape
+        # fs = imgs.shape
 
-        for reps in range(num_reps):
-            for i in range(fs[0]):
-                img = get_transformed_image(imgs[i][:][:])
-                label = labels[i]
-                img = np.array(img).tolist()
-                IMGS.append(img)
-                LABELS.append(label)
+        # for reps in range(num_reps):
+        #     for i in range(fs[0]):
+        #         img = get_transformed_image(imgs[i][:][:])
+        #         label = labels[i]
+        #         img = np.array(img).tolist()
+        #         IMGS.append(img)
+        #         LABELS.append(label)
 
-        IMGS = np.array(IMGS)
-        LABELS = np.array(LABELS)
+        # IMGS = np.array(IMGS)
+        # LABELS = np.array(LABELS)
         return IMGS, LABELS
 
 
@@ -272,8 +267,8 @@ class MTData_March082013(MTData):
     LABEL1_fn = 'psyFaceMag_20121012_210.txt'
     LABEL2_fn = 'psyEyeMag_20121228_285.txt'
     LABEL3_fn = 'psyNoseMag_20130201_285.txt'
-    IMG_OI_fn = 'img_oi818.txt'
-    # IMG_OI_fn = 'img_oi408.txt'
+    # IMG_OI_fn = 'img_oi818.txt'
+    IMG_OI_fn = 'img_oi408.txt'
 
 
 

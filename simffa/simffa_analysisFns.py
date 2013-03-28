@@ -41,7 +41,7 @@ def getPearsonCorr(X,Y):
 def getTopographicOrg(X):
 	X = np.array(X) 
 	fs = X.shape
-	num_pairs = 10000
+	num_pairs = np.int(0.50 * fs[0] * fs[1])
 	AF_dist = []
 	for i in range(num_pairs):
 		i1 = np.random.randint(fs[0])
@@ -49,15 +49,17 @@ def getTopographicOrg(X):
 		i2 = np.random.randint(fs[0])
 		j2 = np.random.randint(fs[1])
 		aDist = np.sqrt((i1-i2)**2 +  (j1-j2)**2)
-		fDist = abs(X[i1,j1] - X[i2,j2])
+		fDist = abs(X[i1,j1] - X[i2,j2]) / (abs(X[i1,j1] + X[i2,j2]) + sys.float_info.epsilon)
+		if (fDist < 0.01) | (fDist > 0.99):
+			continue
 		AF_dist.append([aDist, fDist])
 	AF_dist = np.array(AF_dist)
 	r,p = pearsonr(AF_dist[:,1], AF_dist[:,0])
-	r = -r
+
 	return r
 
 def getClusterSize(X):
-	X = np.array(X) #+ 1 # make sure all are positive
+	X = np.array(X) + 1 # make sure all are positive
 	fs = X.shape
 	cm = sp_meas.center_of_mass(X) #mean of cluster
 	dist_cm  = [[ np.sqrt((cm[0]-j)**2+(cm[1]-i)**2)  for i in range(fs[1])] for j in range(fs[0])]
@@ -68,7 +70,8 @@ def getClusterSize(X):
 def getBlobiness(x):
 	x = x[~np.isnan(x)]
 	x0 = np.abs(x - x.mean()) + sys.float_info.epsilon
-	y = -np.log(x0/len(x.ravel())).mean()
+	# y = -np.log(x0/len(x.ravel())).mean()
+	y = (x0/len(x.ravel())).mean()
 	return y
 
 
@@ -98,15 +101,15 @@ def testAsymmetryIndex():
 		else:
 			n = np.array([[np.random.random() for i in range(50)] for j in range(50)])
 
-		# width = np.int(getClusterSize(n))
+		width = np.int(getClusterSize(n))
 		# width = getBlobiness(n)
-		width = getTopographicOrg(n)
+		# width = getTopographicOrg(n)
 
 		plt.subplot(2,5,ii+1)
 		plt.imshow(n)
 		plt.title('{:.4}'.format(width))
-	
-	plt.savefig('fig/topog_test.png')
+	print 'saving fig/cluster_test.png'
+	plt.savefig('fig/cluster_test.png')
 
 def testCorr():
 	N = 100;

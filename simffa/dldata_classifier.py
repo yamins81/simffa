@@ -488,6 +488,7 @@ def batch_prediction(model, test_X, batchsize):
 #########
 ##stats##
 #########
+from scipy.stats.stats import pearsonr
 
 def get_regression_result(train_actual, test_actual, train_predicted, test_predicted):
     test_results = regression_stats(test_actual, test_predicted, prefix='test')
@@ -620,13 +621,17 @@ def auc_from_prec_and_rec(prec, rec):
     auc = np.sum(h * (prec[1:] + prec[:-1])) / 2.0
     return auc
 
+## this definition of rsquared gives negative values -rishi
+# def rsquared(actual, predicted):
+#     a_mean = actual.mean()
+#     num = np.linalg.norm(actual - predicted) ** 2
+#     denom = np.linalg.norm(actual - a_mean) ** 2
+#     return 1 -  num / denom
 
 def rsquared(actual, predicted):
-    a_mean = actual.mean()
-    num = np.linalg.norm(actual - predicted) ** 2
-    denom = np.linalg.norm(actual - a_mean) ** 2
-    return 1 -  num / denom
-
+    r,p = pearsonr(actual, predicted)
+    rsq = r**2
+    return rsq
     
 def mean_error(actual, predicted):
     num = np.linalg.norm(actual - predicted) ** 2
