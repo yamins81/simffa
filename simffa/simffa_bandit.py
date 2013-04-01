@@ -28,53 +28,44 @@ import simffa_analysisFns as sanal
 ## Bandits ##
 
 @base.as_bandit()
-def SimffaL1Bandit():
+def SimffaL1Bandit(label_id=None, shuf=False):
     template = sp.l1_params
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 @base.as_bandit()
-def SimffaL1GaborBandit():
+def SimffaL1GaborBandit(label_id=None, shuf=False):
     template = sp.l1_params_gabor
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 @base.as_bandit()
-def SimffaL1GaborLargerBandit():
+def SimffaL1GaborLargerBandit(label_id=None, shuf=False):
     template = sp.l1_params_gabor_larger
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 @base.as_bandit()
-def SimffaL2Bandit():
+def SimffaL2Bandit(label_id=None, shuf=False):
     template = sp.l2_params
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 @base.as_bandit()
-def SimffaL2GaborBandit():
+def SimffaL2GaborBandit(label_id=None, shuf=False):
     template = sp.l2_params_gabor
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 @base.as_bandit()
-def SimffaL3Bandit():
+def SimffaL3Bandit(label_id=None, shuf=False):
     template = sp.l3_params
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 @base.as_bandit()
-def SimffaL3GaborBandit():
+def SimffaL3GaborBandit(label_id=None, shuf=False):
     template = sp.l3_params_gabor
-    # dataset = mtdat.MTData_March082013()
-    # imgs,labels = dataset.get_images(0)
-    return scope.bandit_evaluatePsyFace(template, None, None, None)
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+
+@base.as_bandit()
+def SimffaV1LikeBandit(label_id=None, shuf=False):
+    template = sp.v1like_params    
+    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
 
 ####################
 ########Common stuff
@@ -143,15 +134,19 @@ def regression_trainingError(features, labels):
     return rsq
 
 @scope.define
-def bandit_evaluatePsyFace(config=None, features=None, imgs=None, labels=None):
-    if features is None:
-        dataset = mtdat.MTData_March082013()
-        imgs,labels = dataset.get_images()
-        nIm = labels.shape[0]
-        print 'Loading ' + str(nIm) + 'imgs..'
-        features = get_features(imgs, config, verbose=False)
+def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
+
+    dataset = mtdat.MTData_March082013()
+    imgs,labels = dataset.get_images(label_id)
+    nIm = labels.shape[0]
+    print 'Loading ' + str(nIm) + 'imgs..'
+    features = get_features(imgs, config, verbose=False)
 
     features = np.array(features)
+    if shuf==True:
+        t = np.random.random_integers(0,len(labels)-1,len(labels))
+        labels = labels[t]
+
     # features = features[:]
 
     fs = features.shape

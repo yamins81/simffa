@@ -8,6 +8,17 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from sklearn.neighbors import NearestNeighbors
+
+def topographicProcuct(X):
+	neigh = NearestNeighbors()
+	neigh.fit(X)
+	k = 5
+	a,b = neigh.kneighbors(x, n_neighbors=k+1, return_distance=True)
+	kDist = np.array(a)
+	kDist[:,1:]
+
+
 def getPearsonCorr2D(X,Y):
 	# X = np.array(X)
 	# Y = np.array(Y)
@@ -41,7 +52,7 @@ def getPearsonCorr(X,Y):
 def getTopographicOrg(X):
 	X = np.array(X) 
 	fs = X.shape
-	num_pairs = np.int(0.50 * fs[0] * fs[1])
+	num_pairs = fs[0]*fs[1] #probably should sample more points than this
 	AF_dist = []
 	for i in range(num_pairs):
 		i1 = np.random.randint(fs[0])

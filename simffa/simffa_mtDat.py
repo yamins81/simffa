@@ -222,13 +222,16 @@ class MTData(object):
             shutil.rmtree(self.home())
 
 
-    def get_images(self, label_id='label1'):
+    def get_images(self, label_id=1):
+        if label_id == None:
+            label_id = 1
+        label_name = 'label' + str(label_id)
         tmp = np.array(self.meta)
         inds = range(tmp.shape[0])
         image_paths = [self.meta[ind]['filename'] for ind in inds]
         imgs = larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype='uint8', mode='L'),
                            image_paths)
-        labels = np.asarray([self.meta[ind][label_id] for ind in inds])
+        labels = np.asarray([self.meta[ind][label_name] for ind in inds])
     
         IMGS = np.array(imgs)
         LABELS = np.array(labels)
