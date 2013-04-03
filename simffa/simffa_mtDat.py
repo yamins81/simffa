@@ -21,25 +21,10 @@ from skdata import larray
 from skdata.utils import download, extract, int_labels
 from skdata.utils.image import ImgLoader
 
-def get_transformed_image(img):
-    cimg = Image.fromarray(img).copy()
-    if np.random.random() > 0.5:
-        cimg = cimg.transpose(Image.FLIP_LEFT_RIGHT)
-    if np.random.random() > 0.5:
-        cimg = cimg.transpose(Image.FLIP_TOP_BOTTOM) 
-    cimg = cimg.rotate(360*np.random.random())
-
-    xoffset = np.int(np.random.random()*200);
-    yoffset = np.int(np.random.random()*200);
-    cimg = cimg.offset(xoffset, yoffset)
-    
-    return cimg
   
-# base class - MTurk dataset
 class MTData(object):
 
     def __init__(self, meta=None, seed=0, ntrain=100, ntest=100, num_splits=5):
-
         self.seed = seed
         self.ntrain = ntrain
         self.ntest = ntest
@@ -110,7 +95,7 @@ class MTData(object):
                         sha1=sha1)
             meta += [data]
 
-            # translated images ("invariant" dataset)
+            # add translated images ("invariant" dataset)
             for i in range(2):
                 new_tag = '_i'+str(i+1)+'.png'
                 invar_fn = img_fn.replace('.png', new_tag)
@@ -168,50 +153,50 @@ class MTData(object):
                                                 ntest, num_splits)
         return self._splits
 
-    def generate_splits(self, seed, ntrain, ntest, num_splits, labelset=None, catfunc=None):
-        meta = self.meta
-        if labelset is not None:
-            assert catfunc is not None
-        else:
-            labelset = self.names
-            catfunc = lambda x : x['name']
+    # def generate_splits(self, seed, ntrain, ntest, num_splits, labelset=None, catfunc=None):
+    #     meta = self.meta
+    #     if labelset is not None:
+    #         assert catfunc is not None
+    #     else:
+    #         labelset = self.names
+    #         catfunc = lambda x : x['name']
 
-        ntrain = self.ntrain
-        ntest = self.ntest
-        rng = np.random.RandomState(seed)
-        splits = {}
-        for split_id in range(num_splits):
-            splits['train_' + str(split_id)] = []
-            splits['test_' + str(split_id)] = []
-            for label in labelset:
-                cat = [m for m in meta if catfunc(m) == label]
-                L = len(cat)
+    #     ntrain = self.ntrain
+    #     ntest = self.ntest
+    #     rng = np.random.RandomState(seed)
+    #     splits = {}
+    #     for split_id in range(num_splits):
+    #         splits['train_' + str(split_id)] = []
+    #         splits['test_' + str(split_id)] = []
+    #         for label in labelset:
+    #             cat = [m for m in meta if catfunc(m) == label]
+    #             L = len(cat)
 
-                assert L >= ntrain + ntest, 'category %s too small' % name
-                perm = rng.permutation(L)
-                for ind in perm[:ntrain]:
-                    splits['train_' + str(split_id)].append(cat[ind]['filename'])
-                for ind in perm[ntrain: ntrain + ntest]:
-                    splits['test_' + str(split_id)].append(cat[ind]['filename'])
-        return splits
+    #             assert L >= ntrain + ntest, 'category %s too small' % name
+    #             perm = rng.permutation(L)
+    #             for ind in perm[:ntrain]:
+    #                 splits['train_' + str(split_id)].append(cat[ind]['filename'])
+    #             for ind in perm[ntrain: ntrain + ntest]:
+    #                 splits['test_' + str(split_id)].append(cat[ind]['filename'])
+    #     return splits
 
 
-    def generate_regression_splits(self, labels, seed, ntrain, ntest, num_splits):
-        meta = self.meta
-        nIm = np.array(meta).shape[0]
-        rng = np.random.RandomState(seed)
-        splits = {}
-        for split_id in range(num_splits):
-            splits['train_' + str(split_id)] = []
-            splits['test_' + str(split_id)] = []
+    # def generate_regression_splits(self, labels, seed, ntrain, ntest, num_splits):
+    #     meta = self.meta
+    #     nIm = np.array(meta).shape[0]
+    #     rng = np.random.RandomState(seed)
+    #     splits = {}
+    #     for split_id in range(num_splits):
+    #         splits['train_' + str(split_id)] = []
+    #         splits['test_' + str(split_id)] = []
             
-            perm = rng.permutation(nIm)
-            for ind in perm[:ntrain]:
-                splits['train_' + str(split_id)].append(ind)
-            for ind in perm[ntrain: ntrain + ntest]:
-                splits['test_' + str(split_id)].append(ind)
+    #         perm = rng.permutation(nIm)
+    #         for ind in perm[:ntrain]:
+    #             splits['train_' + str(split_id)].append(ind)
+    #         for ind in perm[ntrain: ntrain + ntest]:
+    #             splits['test_' + str(split_id)].append(ind)
 
-        return splits
+    #     return splits
 
     # ------------------------------------------------------------------------
     # -- Dataset Interface: clean_up()
@@ -235,19 +220,7 @@ class MTData(object):
     
         IMGS = np.array(imgs)
         LABELS = np.array(labels)
-        
-        # fs = imgs.shape
-
-        # for reps in range(num_reps):
-        #     for i in range(fs[0]):
-        #         img = get_transformed_image(imgs[i][:][:])
-        #         label = labels[i]
-        #         img = np.array(img).tolist()
-        #         IMGS.append(img)
-        #         LABELS.append(label)
-
-        # IMGS = np.array(IMGS)
-        # LABELS = np.array(LABELS)
+   
         return IMGS, LABELS
 
 
@@ -275,4 +248,18 @@ class MTData_March082013(MTData):
 
 
 
+
+# def get_transformed_image(img):
+#     cimg = Image.fromarray(img).copy()
+#     if np.random.random() > 0.5:
+#         cimg = cimg.transpose(Image.FLIP_LEFT_RIGHT)
+#     if np.random.random() > 0.5:
+#         cimg = cimg.transpose(Image.FLIP_TOP_BOTTOM) 
+#     cimg = cimg.rotate(360*np.random.random())
+
+#     xoffset = np.int(np.random.random()*200);
+#     yoffset = np.int(np.random.random()*200);
+#     cimg = cimg.offset(xoffset, yoffset)
+    
+#     return cimg
 

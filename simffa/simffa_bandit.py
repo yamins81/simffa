@@ -98,14 +98,11 @@ def get_regression_splits(labels, seed, ntrain, ntest, num_splits):
 
 def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_splits=5):
 
-    # features = np.array(features)
-    # labels = np.array(labels)
     fs = features.shape
     if np.array(fs).shape[0] == 4:
         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
 
     splits = get_regression_splits(labels, seed, ntrain, ntest, num_splits)
-    # splits = dataset.generate_regression_splits(labels, seed, ntrain, ntest, num_splits)
     results = []
     rsq = 0;
     for ind in range(num_splits):
@@ -119,7 +116,6 @@ def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_spli
         test_Xy = (test_X, test_y)
         result = train_scikits(train_Xy, test_Xy, 'linear_model.RidgeCV', regression=True)
         rsq = rsq+result[1]['test_rsquared']
-        # results.append(result)
     rsq = rsq / num_splits
 
     return rsq
@@ -143,17 +139,15 @@ def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
     features = get_features(imgs, config, verbose=False)
 
     features = np.array(features)
+
     if shuf==True:
         t = np.random.random_integers(0,len(labels)-1,len(labels))
         labels = labels[t]
-
-    # features = features[:]
 
     fs = features.shape
     num_features = fs[1]*fs[2]*fs[3]    
     record = {}
     record['spec'] = config
-    # record['features_data'] = features
     record['num_features'] = num_features
     record['feature_shape'] = fs
 
@@ -162,7 +156,9 @@ def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
     num_train = np.floor(0.75*nIm)
     num_test = np.floor(0.10*nIm)
     seed = np.random.randint(num_splits)
+    shuf_ind = np.random.random_integers(0,len(labels)-1,len(labels))
     psy_rsq_mu = regression_traintest(features, labels, seed, num_train, num_test, num_splits)
+    psy_rsq_mu_shuf = regression_traintest(features, labels[shuf_ind], seed, num_train, num_test, num_splits)
     
     features = features.mean(3)
     print 'computed map'
@@ -173,15 +169,17 @@ def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
 
     print 'storing stats'
     results = {}
+    results['psyRegress'] = psy_rsq_mu
+    results['psyRegress_shuf'] = psy_rsq_mu_shuf
+
     results['psyCorr'] = psyCorr
     results['psyCorr_hist_n'] = hist_n.tolist()
     results['psyCorr_hist_x'] = hist_x[1:].tolist()
     results['psyCorr_mu'] = np.abs(psyCorr).ravel().mean(0)
-    results['psyCorr_cluster'] = sanal.getClusterSize(psyCorr)/(fs[1]*fs[2])
+    results['psyCorr_cluster'] = sanal.getClusterSize(psyCorr)
     results['psyCorr_blob'] = sanal.getBlobiness(psyCorr)
     results['psyCorr_topog'] = sanal.getTopographicOrg(psyCorr)
-    results['psyRegress'] = psy_rsq_mu
-    
+
     record['results'] = results
     record['attachments'] = {}
     record['loss'] = 1 - psy_rsq_mu
@@ -193,7 +191,6 @@ def evaluate_just_FSI(dataset, config, train=False, **training_data):
     for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
         spatial_averages[k] = record.pop(k)       
     return record, FSI
-    
 
 @scope.define
 def evaluate_FSI(config=None, features=None, labels=None, train=True, **training_data):

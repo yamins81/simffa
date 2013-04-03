@@ -10,6 +10,7 @@ import scipy.stats as stats
 from scipy.stats.stats import pearsonr
 from scipy.stats.stats import nanmean
 
+import simffa_analysisFns as sfns
 from hyperopt.mongoexp import MongoJobs, as_mongo_str
 # import matplotlib
 # matplotlib.use("Agg")
@@ -55,7 +56,7 @@ def sort_maps(Jobs, exps):
     
     metrics = ['cluster', 'blob', 'topog']
 
-    for i in range(3):
+    for i in range(len(exps)):
         exp_key = exps[i]
         C = list(Jobs.find({'exp_key':exp_key,'state':2}))
         nJobs = np.array(C).shape[0]
@@ -72,23 +73,18 @@ def sort_maps(Jobs, exps):
         s_i = [i[0] for i in sorted(enumerate(psyCorr_mu), key=lambda x:x[1])]
 
         count = 0
-        stepSize =  1#int(np.ceil(len(s_i)/5))
+        print str(len(s_i)) + ' jobs'
+        stepSize =  int(np.ceil(len(s_i)/10))
         plt.figure()
         for i in range(0,len(s_i), stepSize):
             s_oi = s_i[i]
             psyCorr_curr = psyCorr[s_oi]
             count = count+1
-            if count > 10:
+            if count > 2:
                 break
-            plt.subplot(2,5,count)
+            plt.subplot(2,1,count)
             plt.imshow(psyCorr_curr)
-            plt.title('{:.4}'.format(psyCorr_mu[s_oi]))
+            tmp = sfns.topographicProcuct(psyCorr_curr)
+            # plt.title('{:.4}'.format(psyCorr_mu[s_oi]))
+            plt.title('{:.4}'.format(tmp))
             plt.colorbar()
-
-# conn = pm.Connection('localhost', 22334)
-# db = conn['simffa']
-# Jobs = db['jobs']
-# exps = ['SimffaL1BanditRandom', 'SimffaL2BanditRandom', 'SimffaL3BanditRandom']
-# scatter_metric(Jobs, exps)
-# sort_maps(Jobs, exps)
-# plt.show()
