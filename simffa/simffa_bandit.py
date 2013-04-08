@@ -114,7 +114,8 @@ def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_spli
         test_y = labels[test_inds]
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
-        result = train_scikits(train_Xy, test_Xy, 'linear_model.RidgeCV', regression=True)
+        result = train_scikits(train_Xy, test_Xy, 'pls.RidgeCV', regression=True)
+        # result = train_scikits(train_Xy, test_Xy, 'linear_model.RidgeCV', regression=True)
         rsq = rsq+result[1]['test_rsquared']
     rsq = rsq / num_splits
 
@@ -160,25 +161,25 @@ def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
     psy_rsq_mu = regression_traintest(features, labels, seed, num_train, num_test, num_splits)
     psy_rsq_mu_shuf = regression_traintest(features, labels[shuf_ind], seed, num_train, num_test, num_splits)
     
-    features = features.mean(3)
-    print 'computed map'
-    psyCorr = sanal.getPearsonCorr2D(features, labels)
-    nonnanCorr = np.array(psyCorr).ravel()
-    nonnanCorr = nonnanCorr[~np.isnan(nonnanCorr)]
-    hist_n, hist_x = np.histogram(nonnanCorr, bins=50)
+    # features = features.mean(3)
+    # print 'computed map'
+    # psyCorr = sanal.getPearsonCorr2D(features, labels)
+    # nonnanCorr = np.array(psyCorr).ravel()
+    # nonnanCorr = nonnanCorr[~np.isnan(nonnanCorr)]
+    # hist_n, hist_x = np.histogram(nonnanCorr, bins=50)
 
     print 'storing stats'
     results = {}
     results['psyRegress'] = psy_rsq_mu
     results['psyRegress_shuf'] = psy_rsq_mu_shuf
 
-    results['psyCorr'] = psyCorr
-    results['psyCorr_hist_n'] = hist_n.tolist()
-    results['psyCorr_hist_x'] = hist_x[1:].tolist()
-    results['psyCorr_mu'] = np.abs(psyCorr).ravel().mean(0)
-    results['psyCorr_cluster'] = sanal.getClusterSize(psyCorr)
-    results['psyCorr_blob'] = sanal.getBlobiness(psyCorr)
-    results['psyCorr_topog'] = sanal.getTopographicOrg(psyCorr)
+    # results['psyCorr'] = psyCorr
+    # results['psyCorr_hist_n'] = hist_n.tolist()
+    # results['psyCorr_hist_x'] = hist_x[1:].tolist()
+    # results['psyCorr_mu'] = np.abs(psyCorr).ravel().mean(0)
+    # results['psyCorr_cluster'] = sanal.getClusterSize(psyCorr)
+    # results['psyCorr_blob'] = sanal.getBlobiness(psyCorr)
+    # results['psyCorr_topog'] = sanal.getTopographicOrg(psyCorr)
 
     record['results'] = results
     record['attachments'] = {}

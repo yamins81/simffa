@@ -97,6 +97,9 @@ def train_only_asgd(train_Xy,
 try:
     from sklearn import svm as sklearn_svm
     from sklearn import linear_model as sklearn_linear_model
+    from sklearn import neighbors as sklearn_neighbors
+    from sklearn import ensemble as sklearn_ensemble
+    from sklearn import pls as sklearn_pls
 except ImportError:
     print("Can't import scikits stuff")
 
@@ -225,10 +228,19 @@ def train_scikits_core(train_features,
         model_kwargs['n_features'] = train_features.shape[1]
     elif model_type.startswith('svm.'):
         ct = model_type.split('.')[-1]
-        cls = getattr(sklearn_svm,ct)
+        cls = getattr(sklearn_svm, ct)
     elif model_type.startswith('linear_model.'):
         ct = model_type.split('.')[-1]
-        cls = getattr(sklearn_linear_model,ct)
+        cls = getattr(sklearn_linear_model, ct)
+    elif model_type.startswith('pls.'):
+        ct = model_type.split('.')[-1]
+        cls = getattr(sklearn_pls, ct)
+    elif model_type.startswith('neighbors.'):
+        ct = model_type.split('.')[-1]
+        cls = getattr(sklearn_neighbors, ct)
+    elif model_type.startswith('ensemble.'):
+        ct = model_type.split('.')[-1]
+        cls = getattr(sklearn_ensemble, ct)
     else:
         raise ValueError('Model type %s not recognized' % model_type)
 
@@ -488,7 +500,6 @@ def batch_prediction(model, test_X, batchsize):
 #########
 ##stats##
 #########
-from scipy.stats.stats import pearsonr
 
 def get_regression_result(train_actual, test_actual, train_predicted, test_predicted):
     test_results = regression_stats(test_actual, test_predicted, prefix='test')
@@ -621,17 +632,13 @@ def auc_from_prec_and_rec(prec, rec):
     auc = np.sum(h * (prec[1:] + prec[:-1])) / 2.0
     return auc
 
-## this definition of rsquared gives negative values -rishi
-# def rsquared(actual, predicted):
-#     a_mean = actual.mean()
-#     num = np.linalg.norm(actual - predicted) ** 2
-#     denom = np.linalg.norm(actual - a_mean) ** 2
-#     return 1 -  num / denom
 
 def rsquared(actual, predicted):
-    r,p = pearsonr(actual, predicted)
-    rsq = r**2
-    return rsq
+    a_mean = actual.mean()
+    num = np.linalg.norm(actual - predicted) ** 2
+    denom = np.linalg.norm(actual - a_mean) ** 2
+    return 1 -  num / denom
+
     
 def mean_error(actual, predicted):
     num = np.linalg.norm(actual - predicted) ** 2
@@ -650,7 +657,8 @@ def precision_and_recall(actual, predicted, cls, bias=None):
     rec = tp / np.dot(predicted == cls, bias)
     prec = tp / (fp + tp)
     return prec, rec
-
+    
+    
 
 
 #########
@@ -756,4 +764,3 @@ def simple_bracket_min(f, pt0, pt1):
     if v0 > v1:
         while v0 > v1:
             raise NotImplementedError()
-

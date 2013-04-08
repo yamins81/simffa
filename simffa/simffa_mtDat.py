@@ -75,7 +75,7 @@ class MTData(object):
         metanames = ['filename', 'id', 'faceLabel', 'eyeLabel', 'noseLabel', 'hash']
         s_im = img_oi.shape
         # maxImgs = 1000
-        maxImgs = 50
+        maxImgs = 1000
         nIm = min(maxImgs, s_im[0])
         for i in range(nIm):
             ind = np.int(img_oi[i])
@@ -96,18 +96,18 @@ class MTData(object):
             meta += [data]
 
             # add translated images ("invariant" dataset)
-            for i in range(2):
-                new_tag = '_i'+str(i+1)+'.png'
-                invar_fn = img_fn.replace('.png', new_tag)
-                img_data = open(invar_fn, 'rb').read()
-                sha1 = hashlib.sha1(img_data).hexdigest()
-                data2 = dict(filename=invar_fn,
-                            id=ind,
-                            label1=label1,
-                            label2=label2,
-                            label3=label3,
-                            sha1=sha1)
-                meta += [data2]
+            # for i in range(2):
+            #     new_tag = '_i'+str(i+1)+'.png'
+            #     invar_fn = img_fn.replace('.png', new_tag)
+            #     img_data = open(invar_fn, 'rb').read()
+            #     sha1 = hashlib.sha1(img_data).hexdigest()
+            #     data2 = dict(filename=invar_fn,
+            #                 id=ind,
+            #                 label1=label1,
+            #                 label2=label2,
+            #                 label3=label3,
+            #                 sha1=sha1)
+            #     meta += [data2]
 
         # meta = tb.tabarray(records=meta, names=metanames)
         return meta

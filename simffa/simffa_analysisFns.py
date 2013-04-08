@@ -127,7 +127,7 @@ def getClusterSize(X):
 	dist_cm  = [[ np.sqrt((cm[0]-j)**2+(cm[1]-i)**2)  for i in range(fs[1])] for j in range(fs[0])]
 	weightedDist = dist_cm * X
 	clusterSize = weightedDist.sum() / np.array(X).sum()
-	relativeCluterSize = clusterSize / fs[0]
+	relativeClusterSize = clusterSize / fs[0]
 	return relativeClusterSize
 
 # how far from flat is the map
