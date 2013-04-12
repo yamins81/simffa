@@ -9,6 +9,7 @@ except ImportError:
 
 from sklearn.metrics.pairwise import pairwise_distances 
 import scipy.stats as st
+from yamutils.stats import pearsonr, spearmanr
 
 #############
 #####asgd#####
@@ -509,7 +510,7 @@ def get_regression_result(train_actual, test_actual, train_predicted, test_predi
 
 
 def regression_stats(actual, predicted, prefix='test'):
-    return {prefix+'_rsquared' : rsquared(actual, predicted),
+    return {prefix+'_rsquared' : pearson_rsquared(actual, predicted),
             prefix+'_mean_error' : mean_error(actual, predicted),
             prefix + '_prediction': predicted.tolist()}
 
@@ -638,6 +639,10 @@ def rsquared(actual, predicted):
     num = np.linalg.norm(actual - predicted) ** 2
     denom = np.linalg.norm(actual - a_mean) ** 2
     return 1 -  num / denom
+
+def pearson_rsquared(actual, predicted):
+    r,p = pearsonr(actual, predicted)
+    return r**2
 
     
 def mean_error(actual, predicted):

@@ -30,42 +30,42 @@ import simffa_analysisFns as sanal
 @base.as_bandit()
 def SimffaL1Bandit(label_id=None, shuf=False):
     template = sp.l1_params
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaL1GaborBandit(label_id=None, shuf=False):
     template = sp.l1_params_gabor
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaL1GaborLargerBandit(label_id=None, shuf=False):
     template = sp.l1_params_gabor_larger
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaL2Bandit(label_id=None, shuf=False):
     template = sp.l2_params
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaL2GaborBandit(label_id=None, shuf=False):
     template = sp.l2_params_gabor
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaL3Bandit(label_id=None, shuf=False):
     template = sp.l3_params
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaL3GaborBandit(label_id=None, shuf=False):
     template = sp.l3_params_gabor
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 @base.as_bandit()
 def SimffaV1LikeBandit(label_id=None, shuf=False):
     template = sp.v1like_params    
-    return scope.bandit_evaluatePsyFace(template, label_id, shuf)
+    return scope.bandit_evaluate(template, label_id, shuf)
 
 ####################
 ########Common stuff
@@ -78,6 +78,7 @@ def get_features(X, config, verbose=False, dirname=None, fname_tag=None):
                     basedir=dirname,
                     name=fname_tag, 
                     save=False) 
+    features = np.array(features)
     return features
     
 def get_regression_splits(labels, seed, ntrain, ntest, num_splits):
@@ -96,12 +97,10 @@ def get_regression_splits(labels, seed, ntrain, ntest, num_splits):
 
         return splits
 
-def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_splits=5):
-
+def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_splits=5, algo='pls.PLSRegression'):
     fs = features.shape
     if np.array(fs).shape[0] == 4:
         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
-
     splits = get_regression_splits(labels, seed, ntrain, ntest, num_splits)
     results = []
     rsq = 0;
@@ -114,12 +113,30 @@ def regression_traintest(features, labels, seed=0, ntrain=80, ntest=30, num_spli
         test_y = labels[test_inds]
         train_Xy = (train_X, train_y)
         test_Xy = (test_X, test_y)
-        result = train_scikits(train_Xy, test_Xy, 'pls.RidgeCV', regression=True)
+        result = train_scikits(train_Xy, test_Xy, algo, regression=True)
         # result = train_scikits(train_Xy, test_Xy, 'linear_model.RidgeCV', regression=True)
         rsq = rsq+result[1]['test_rsquared']
     rsq = rsq / num_splits
 
     return rsq
+
+def get_regression_results(features, labels):
+    num_splits = 4
+    nnan = ~np.isnan(labels)
+    labels = labels[nnan]
+    features = features[nnan,:]
+    nIm = labels.shape[0]
+    num_train = np.floor(0.75*nIm)
+    num_test = np.floor(0.25*nIm)
+    seed = np.random.randint(num_splits)
+    
+    psy_rsq_mu = regression_traintest(features, labels, seed, num_train, num_test, num_splits)
+
+    # shuf_ind = np.random.random_integers(0,len(labels)-1,len(labels))
+    # psy_rsq_mu_shuf = regression_traintest(features, labels[shuf_ind], seed, num_train, num_test, num_splits)
+
+    return psy_rsq_mu
+
     
 def regression_trainingError(features, labels):
     fs = features.shape
@@ -131,6 +148,43 @@ def regression_trainingError(features, labels):
     return rsq
 
 @scope.define
+def bandit_evaluate(config=None, label_id=None, shuf=False):
+    dataset = mtdat.MTData_March082013()
+    imgs,labels = dataset.get_images(label_id)
+    nIm = labels.shape[0]
+    print 'Loading ' + str(nIm) + 'imgs...'
+    features = get_features(imgs, config, verbose=False)
+
+    fs = features.shape
+    num_features = fs[1]*fs[2]*fs[3]    
+    
+    print 'regressing model on labels'
+    regress_r2 = {}
+    labelnames = ['face', 'eye']
+    neuralname = ['pl', 'ml', 'al']
+
+    for label_i in range(len(labelnames)):
+        label = dataset.get_labels(label_i+1)
+        regress_r2[labelnames[label_i]] = get_regression_results(features, label)
+        print 'done ' + labelnames[label_i]
+
+    for neural_i in range(len(neuralname)):
+        curr_neural = dataset.get_neural_labels(neural_i+1)
+        tmp = [get_regression_results(features, curr_neural[:,ei]) for ei in range(4)]
+        regress_r2[neuralname[neural_i]] = tmp
+
+    results = {}
+    results['regress_r2'] = regress_r2
+
+    record = {}
+    record['spec'] = config
+    record['results'] = results
+    record['attachments'] = {}
+    record['loss'] = 1 - regress_r2['face']
+    record['status'] = 'ok'
+    return record
+
+@scope.define
 def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
 
     dataset = mtdat.MTData_March082013()
@@ -139,7 +193,6 @@ def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
     print 'Loading ' + str(nIm) + 'imgs..'
     features = get_features(imgs, config, verbose=False)
 
-    features = np.array(features)
 
     if shuf==True:
         t = np.random.random_integers(0,len(labels)-1,len(labels))
@@ -187,97 +240,97 @@ def bandit_evaluatePsyFace(config=None, label_id=None, shuf=False):
     record['status'] = 'ok'
     return record
 
-def evaluate_just_FSI(dataset, config, train=False, **training_data):
-    record, FSI = evaluate_FSI(dataset, config, train=train, **training_data)
-    for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
-        spatial_averages[k] = record.pop(k)       
-    return record, FSI
+# def evaluate_just_FSI(dataset, config, train=False, **training_data):
+#     record, FSI = evaluate_FSI(dataset, config, train=train, **training_data)
+#     for k in ['F_s_avg', 'BO_s_avg', 'FSI_s_avg']:
+#         spatial_averages[k] = record.pop(k)       
+#     return record, FSI
 
-@scope.define
-def evaluate_FSI(config=None, features=None, labels=None, train=True, **training_data):
-    if features is None:
-        dataset = fbo.FaceBodyObject20110803()
-        imgs, labels = dataset.img_classification_task()
-        features = get_features(imgs, config, verbose=True)
+# @scope.define
+# def evaluate_FSI(config=None, features=None, labels=None, train=True, **training_data):
+#     if features is None:
+#         dataset = fbo.FaceBodyObject20110803()
+#         imgs, labels = dataset.img_classification_task()
+#         features = get_features(imgs, config, verbose=True)
         
-    features = features[:]
-    features = np.array(features)
-    fs = features.shape
-    num_features = fs[1]*fs[2]*fs[3]    
-    meta = dataset.meta
-    face_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] == 'Face']
-    bo_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] != 'Face']
+#     features = features[:]
+#     features = np.array(features)
+#     fs = features.shape
+#     num_features = fs[1]*fs[2]*fs[3]    
+#     meta = dataset.meta
+#     face_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] == 'Face']
+#     bo_inds = [ind for ind in range(len(meta)) if meta[ind]['name'] != 'Face']
     
-    record = {}
-    record['num_features'] = num_features
-    record['feature_shape'] = fs
-    thresholds = np.arange(0,1,.01)
-    record['thresholds'] = thresholds.tolist()
+#     record = {}
+#     record['num_features'] = num_features
+#     record['feature_shape'] = fs
+#     thresholds = np.arange(0,1,.01)
+#     record['thresholds'] = thresholds.tolist()
     
-    F = features[face_inds].mean(0)
-    BO = features[bo_inds].mean(0)
-    record['F_s_avg'] = F.mean(2).tolist()
-    record['BO_s_avg'] = BO.mean(2).tolist()
+#     F = features[face_inds].mean(0)
+#     BO = features[bo_inds].mean(0)
+#     record['F_s_avg'] = F.mean(2).tolist()
+#     record['BO_s_avg'] = BO.mean(2).tolist()
   
-    FSI = (F - BO) / (np.abs(F) + np.abs(BO))
-    FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
-    FSI_fractions = [c/ float(num_features) for c in FSI_counts]
-    record['fsi_fractions'] = FSI_fractions
-    record['FSI_s_avg'] = FSI.mean(2).tolist()
-    record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
+#     FSI = (F - BO) / (np.abs(F) + np.abs(BO))
+#     FSI_counts = [len((FSI > thres).nonzero()[0]) for thres in thresholds]
+#     FSI_fractions = [c/ float(num_features) for c in FSI_counts]
+#     record['fsi_fractions'] = FSI_fractions
+#     record['FSI_s_avg'] = FSI.mean(2).tolist()
+#     record['Face_selective_s_avg'] = (FSI > .333).astype(np.float).mean(2).tolist()
 
-    F_rect = np.abs(features[face_inds]).mean(0)
-    BO_rect = np.abs(features[bo_inds]).mean(0)
-    FSI_rect = (F_rect - BO_rect) / (F_rect + BO_rect)
-    FSI_rect_counts = [len((FSI_rect > thres).nonzero()[0]) for thres in thresholds]
-    FSI_rect_fractions = [c/ float(num_features) for c in FSI_rect_counts]
-    record['rectified_fsi_fractions'] = FSI_rect_fractions
-    record['rectified_FSI_s_avg'] = FSI_rect.mean(2).tolist()
-    record['rectified_Face_selective_s_avg'] = (FSI_rect > .333).astype(np.float).mean(2).tolist()
+#     F_rect = np.abs(features[face_inds]).mean(0)
+#     BO_rect = np.abs(features[bo_inds]).mean(0)
+#     FSI_rect = (F_rect - BO_rect) / (F_rect + BO_rect)
+#     FSI_rect_counts = [len((FSI_rect > thres).nonzero()[0]) for thres in thresholds]
+#     FSI_rect_fractions = [c/ float(num_features) for c in FSI_rect_counts]
+#     record['rectified_fsi_fractions'] = FSI_rect_fractions
+#     record['rectified_FSI_s_avg'] = FSI_rect.mean(2).tolist()
+#     record['rectified_Face_selective_s_avg'] = (FSI_rect > .333).astype(np.float).mean(2).tolist()
 
-    features_shifted = features - np.array(features).min()
-    F_shifted = features_shifted[face_inds].mean(0)
-    BO_shifted = features_shifted[bo_inds].mean(0)
-    FSI_shifted = (F_shifted - BO_shifted) / (F_shifted + BO_shifted)
-    FSI_shifted_counts = [len((FSI_shifted > thres).nonzero()[0]) for thres in thresholds]
-    FSI_shifted_fractions = [c/ float(num_features) for c in FSI_shifted_counts]
-    record['shifted_fsi_fractions'] = FSI_shifted_fractions
-    record['shifted_FSI_s_avg'] = FSI_shifted.mean(2).tolist()
-    record['shifted_Face_selective_s_avg'] = (FSI_shifted > .333).astype(np.float).mean(2).tolist()
+#     features_shifted = features - np.array(features).min()
+#     F_shifted = features_shifted[face_inds].mean(0)
+#     BO_shifted = features_shifted[bo_inds].mean(0)
+#     FSI_shifted = (F_shifted - BO_shifted) / (F_shifted + BO_shifted)
+#     FSI_shifted_counts = [len((FSI_shifted > thres).nonzero()[0]) for thres in thresholds]
+#     FSI_shifted_fractions = [c/ float(num_features) for c in FSI_shifted_counts]
+#     record['shifted_fsi_fractions'] = FSI_shifted_fractions
+#     record['shifted_FSI_s_avg'] = FSI_shifted.mean(2).tolist()
+#     record['shifted_Face_selective_s_avg'] = (FSI_shifted > .333).astype(np.float).mean(2).tolist()
     
-    dprime = (F - BO) / features.std(0)
-    dprime_h, dprime_b = np.histogram(dprime, bins=50)
-    record['dprime_hist'] = dprime_h.tolist()
-    record['dprime_bins'] = dprime_b.tolist()
-    record['dprime_selective_fraction'] = float(len((dprime.flatten() > 1).nonzero()[0]) / float(num_features))
-    record['dprime_selective_s_avg'] = (dprime > 1).astype(np.float).mean(2).tolist()
+#     dprime = (F - BO) / features.std(0)
+#     dprime_h, dprime_b = np.histogram(dprime, bins=50)
+#     record['dprime_hist'] = dprime_h.tolist()
+#     record['dprime_bins'] = dprime_b.tolist()
+#     record['dprime_selective_fraction'] = float(len((dprime.flatten() > 1).nonzero()[0]) / float(num_features))
+#     record['dprime_selective_s_avg'] = (dprime > 1).astype(np.float).mean(2).tolist()
     
-    Z = np.row_stack([features[face_inds], features[bo_inds]])
-    R = Z.argsort(0)
-    nf = len(face_inds)
-    ndist = len(bo_inds)
-    roc_FSI = (R[:nf].sum(0) - ((nf)**2 + nf)/2.) / float(nf*ndist)
-    roc_FSI_counts = [len((roc_FSI > thres).nonzero()[0]) for thres in thresholds]
-    roc_FSI_fractions = [c/ float(num_features) for c in roc_FSI_counts]
-    record['roc_fsi_fractions'] = roc_FSI_fractions
-    record['roc_FSI_s_avg'] = roc_FSI.mean(2).tolist()
-    record['roc_Face_selective_s_avg'] = (roc_FSI > .75).astype(np.float).mean(2).tolist()
+#     Z = np.row_stack([features[face_inds], features[bo_inds]])
+#     R = Z.argsort(0)
+#     nf = len(face_inds)
+#     ndist = len(bo_inds)
+#     roc_FSI = (R[:nf].sum(0) - ((nf)**2 + nf)/2.) / float(nf*ndist)
+#     roc_FSI_counts = [len((roc_FSI > thres).nonzero()[0]) for thres in thresholds]
+#     roc_FSI_fractions = [c/ float(num_features) for c in roc_FSI_counts]
+#     record['roc_fsi_fractions'] = roc_FSI_fractions
+#     record['roc_FSI_s_avg'] = roc_FSI.mean(2).tolist()
+#     record['roc_Face_selective_s_avg'] = (roc_FSI > .75).astype(np.float).mean(2).tolist()
     
-    if train:
-        features = features.reshape((fs[0],num_features))
-        STATS = ['train_accuracy','train_ap','train_auc','test_accuracy','test_ap','test_auc']
-        catfuncs = [('Face_Nonface',lambda x : x['name'] if x['name'] == 'Face' else 'Nonface'),
-                    ('Face_Body_Object',None)]
-        record['training_data'] = {}
-        for (problem, func) in catfuncs:
-            results = traintest(dataset, features, catfunc=func, **training_data)
-            stats = {}
-            for stat in STATS:
-                stats[stat] = np.mean([r[1][stat] for r in results])
-            record['training_data'][problem] = stats
-        record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
-    record['status'] = 'ok'
-    return record
+#     if train:
+#         features = features.reshape((fs[0],num_features))
+#         STATS = ['train_accuracy','train_ap','train_auc','test_accuracy','test_ap','test_auc']
+#         catfuncs = [('Face_Nonface',lambda x : x['name'] if x['name'] == 'Face' else 'Nonface'),
+#                     ('Face_Body_Object',None)]
+#         record['training_data'] = {}
+#         for (problem, func) in catfuncs:
+#             results = traintest(dataset, features, catfunc=func, **training_data)
+#             stats = {}
+#             for stat in STATS:
+#                 stats[stat] = np.mean([r[1][stat] for r in results])
+#             record['training_data'][problem] = stats
+#         record['loss'] = 1 - (record['training_data']['Face_Nonface']['test_accuracy'])/100.
+#     record['status'] = 'ok'
+#     return record
 
 
 
