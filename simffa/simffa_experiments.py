@@ -10,6 +10,8 @@ import hyperopt
 from hyperopt.base import trials_from_docs
 from hyperopt.mongoexp import MongoTrials
 from hyperopt.utils import json_call
+import gridfs
+
 
 
 class InterleaveAlgo(hyperopt.BanditAlgo):
@@ -139,3 +141,57 @@ def suggest_multiple_from_name(dbname, host, port, bandit_algo_names, bandit_nam
         exp.run(N, block_until_done=True)
     else:
         return exp
+
+# from https://github.com/yamins81/devthor/blob/master/devthor/procedures.py
+# def run_one(config, dbname, host, port, bandit_names, 
+#     exp_keys, N, bandit_args_list, bandit_kwargs_list):
+    
+#     conn = pm.Connection(host, port)    
+#     new_trials = MongoTrials('mongo://%s:%d/%s/jobs' % (host, port, dbname),
+#                      refresh=False, exp_key=exp_keys)
+
+#     new_id = new_trials.new_trial_ids(1)
+#     old = conn[dbn]['jobs'].find({'state':2})[0]
+#     new_misc = old['misc']
+#     new_misc['tid'] = new_id
+#     new_misc['cmd'][1] = new_misc['cmd'][1] + '_v2'
+#     new_result = {'status': hyperopt.STATUS_NEW}
+#     new_docs = new_trials.new_trial_docs([new_id],
+#                 [None], [new_result], [new_misc])
+#     new_trials.insert_trial_docs(new_docs)
+#     new_trials.refresh()
+#     block_until_done(new_trials, 2)
+
+#     # bandit_datas = filter(lambda x: x.startswith('bandit_data_'), fs.list())
+#     # for _an in bandit_datas:
+#     #     new_trials.attachments[_an] = fs.get_last_version(_an).read()
+#     # new_ids = new_trials.new_trial_ids(len(models))
+#     # new_trials.refresh()
+
+#     for new_id, m in zip(new_ids, models):
+#         old = conn[dbn]['jobs'].find({'state':2})[0]
+#         old_misc = old['misc']
+#         new_misc = copy.deepcopy(old_misc)
+#         new_misc['workdir'] = os.path.join(os.environ['HOME'], 'hyperopt-workdir')
+#         new_misc['tid'] = new_id
+#         new_result = {'status': hyperopt.STATUS_NEW}
+#         new_docs = new_trials.new_trial_docs([new_id],
+#                 [None], [new_result], [new_misc])
+#         new_trials.insert_trial_docs(new_docs)
+#     new_trials.refresh()
+#     block_until_done(new_trials, 2)
+    
+
+def block_until_done(trials, poll_interval_secs):
+    unfinished_states = [hyperopt.JOB_STATE_NEW, hyperopt.JOB_STATE_RUNNING]
+
+    def get_queue_len():
+        return trials.count_by_state_unsynced(unfinished_states)
+
+    qlen = get_queue_len()
+    while qlen > 0:
+        print('Waiting for %d jobs to finish ...' % qlen)
+        time.sleep(poll_interval_secs)
+        qlen = get_queue_len()
+    trials.refresh()
+

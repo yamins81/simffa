@@ -22,24 +22,20 @@ from hyperopt import base
 from pyll import scope
 
 import simffa_params as sp
+import simffa_bandit as sb
 import simffa_mtDat as mtdat
-from simffa_utils import slm_h5
-
 import skdata as skd
+
+from simffa_utils import slm_h5
+from dldata_classifier import train_scikits
+
 from skdata import larray
 from skdata.utils import download, extract, int_labels
 from skdata.utils.image import ImgLoader
 
-from dldata_classifier import train_scikits
-
 class FeretData(object):
 
-    def __init__(self, meta=None, seed=0, ntrain=100, ntest=100, num_splits=5):
-        self.seed = seed
-        self.ntrain = ntrain
-        self.ntest = ntest
-        self.num_splits = num_splits
-
+    def __init__(self, meta=None):
         if meta is not None:
             self._meta = meta
         self.name = self.__class__.__name__
@@ -59,6 +55,7 @@ class FeretData(object):
         pose_defs = {'ba':0, 'bb':50, 'bc':40, 'bd':25, 'be':15, 'fa':0, 'fb':0,
                     'ql':-22.5, 'qr':22.5, 'hl':-67.5, 'hr':67.5, 'pl':-90,'pr':90}  
         meta = []
+
         for img_filename in img_filenames:
             img_data = open(img_filename, 'rb').read()
             sha1 = hashlib.sha1(img_data).hexdigest()
@@ -164,6 +161,10 @@ def getFERETsplits(labels, seed, nClasses, num_splits):
 def get_FERET_classification(features, labels, nClasses=36, num_splits=2):
 
     splits = getFERETsplits(labels, np.random.randint(nClasses), nClasses, num_splits)
+    fs = features.shape
+    if np.array(fs).shape[0] == 4:
+        features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
+
     id_test_accuracy = 0
     view_test_rsq = 0
     for i in range(num_splits):
@@ -179,6 +180,7 @@ def get_FERET_classification(features, labels, nClasses=36, num_splits=2):
         test_Xy = (test_X, test_y)
         result = train_scikits(train_Xy, test_Xy, 'libSVM')
         test_accuracy = test_accuracy + result[1]['test_accuracy']
+        print 'done id classification'
 
         #viewpoint regression
         train_y = labels[train_inds,1]
@@ -187,6 +189,7 @@ def get_FERET_classification(features, labels, nClasses=36, num_splits=2):
         test_Xy = (test_X, test_y)
         result = train_scikits(train_Xy, test_Xy, 'pls.PLSRegression')
         view_test_rsq = view_test_rsq + result[1]['test_rsquared']
+        print 'done vp regression'
 
     test_accuracy = test_accuracy / num_splits
     view_test_rsq = view_test_rsq / num_splits
@@ -197,11 +200,13 @@ def feret_bandit_evaluate(config=None):
     dataset = FERET()
     imgs,labels = dataset.get_images()
     nIm = labels.shape[0]
+    nLabels = labels.shape[1]
     print 'Loading ' + str(nIm) + ' FERET imgs...'
+    print 'with ' + str(nLabels) + ' labels...'
     features = get_features(imgs, config, verbose=False)
     
     print 'Evaluating model on id classificaiton and viewpoint regression'
-    test_accuracy, view_test_rsq = get_FERET_classification(features, labels, nClasses=36, num_splits=2)
+    test_accuracy, view_test_rsq = get_FERET_classification(features, labels, nClasses=5, num_splits=2)
     results = {}
     results['id_accuracy'] = test_accuracy
     results['view_rsq'] = view_test_rsq
@@ -228,7 +233,7 @@ def feret_bandit_evaluate2(config=None, stats=None):
 
     for neural_i in range(len(neuralname)):
         curr_neural = dataset.get_neural_labels(neural_i+1)
-        tmp = [get_regression_results(features, curr_neural[:,ei]) for ei in range(4)]
+        tmp = [sb.get_regression_results(features, curr_neural[:,ei]) for ei in range(4)]
         regress_r2[neuralname[neural_i]] = tmp
 
     results = {}

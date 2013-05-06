@@ -181,7 +181,7 @@ def get_regression_result(labels, train_X, test_X, train_inds, test_inds):
     test_y = labels[test_inds]
     train_Xy = (train_X, train_y)
     test_Xy = (test_X, test_y)
-    result = train_scikits(train_Xy, test_Xy, 'pls.PLSRegression')
+    result = train_scikits(train_Xy, test_Xy, 'linear_model.RidgeCV', regression=True)
     test_rsq = result[1]['test_rsquared']
     return test_rsq
 
@@ -191,9 +191,8 @@ def get_classification_result(labels, train_X, test_X, train_inds, test_inds):
     train_Xy = (train_X, train_y)
     test_Xy = (test_X, test_y)
     result = train_scikits(train_Xy, test_Xy, 'libSVM')
-    test_accuracy = result[1]['test_accuracy'] / 100
+    test_accuracy = result[1]['test_accuracy'] / 100.0
     return test_accuracy
-
 
 def evaluate_on_tasks(features, labels, nClasses=36, num_splits=2):
 
@@ -207,6 +206,9 @@ def evaluate_on_tasks(features, labels, nClasses=36, num_splits=2):
     
     pose_regress = {}
     pose_params = ['s', 'ty', 'tz', 'rxy', 'rxz', 'ryz']
+    for li in range(len(pose_params)):
+            pose_regress[pose_params[li]] = 0
+
     view_test_rsq = 0
     for i in range(num_splits):
         train_inds = np.array(splits['train_' + str(i)])
@@ -214,48 +216,28 @@ def evaluate_on_tasks(features, labels, nClasses=36, num_splits=2):
         train_X = features[train_inds]
         test_X = features[test_inds]
 
-        # id classification
         id_test_accuracy = id_test_accuracy + get_classification_result(labels[:,0], train_X, test_X, train_inds, test_inds)
-        # train_y = labels[train_inds,0]
-        # test_y = labels[test_inds,0]
-        # train_Xy = (train_X, train_y)
-        # test_Xy = (test_X, test_y)
-        # result = train_scikits(train_Xy, test_Xy, 'libSVM')
-        # id_test_accuracy = id_test_accuracy + result[1]['test_accuracy']
-        print 'done id classification'
+        # print 'done id classification'
 
         express_test_accuracy = express_test_accuracy + get_classification_result(labels[:,1], train_X, test_X, train_inds, test_inds)
-        # train_y = labels[train_inds,1]
-        # test_y = labels[test_inds,1]
-        # train_Xy = (train_X, train_y)
-        # test_Xy = (test_X, test_y)
-        # result = train_scikits(train_Xy, test_Xy, 'libSVM')
-        # express_test_accuracy = express_test_accuracy + result[1]['test_accuracy']
-        print 'done expression classification'
+        # print 'done expression classification'
 
         for li in range(len(pose_params)):
             pose_regress[pose_params[li]] = pose_regress[pose_params[li]] + get_regression_result(labels[:,2+li], train_X, test_X, train_inds, test_inds)
-        #viewpoint regression
-        # train_y = labels[train_inds,1]
-        # test_y = labels[test_inds,1]
-        # train_Xy = (train_X, train_y)
-        # test_Xy = (test_X, test_y)
-        # result = train_scikits(train_Xy, test_Xy, 'pls.PLSRegression')
-        # view_test_rsq = view_test_rsq + result[1]['test_rsquared']
-        # print 'done vp regression'
-
+        # print 'done all pose get_regressions'
     id_test_accuracy = id_test_accuracy / num_splits
     express_test_accuracy = express_test_accuracy / num_splits
 
     avg_pose_regress = 0
     for li in range(len(pose_params)):
         pose_regress[pose_params[li]] = pose_regress[pose_params[li]] / num_splits
-        avg_pose_regress = avg_pose_regress + (pose_regress[pose_params[li]])/len(pose_params)
-    
-    # print 'identity classification: ' + str(id_test_accuracy)
-    # print 'expression classification: ' + str(express_test_accuracy)
-
-
+        avg_pose_regress = avg_pose_regress + np.double(pose_regress[pose_params[li]])/len(pose_params)
+    # avg_pose_regress = avg_pose_regress[0][0] # stupid hack
+    print '***'
+    print 'identity classification: ' + str(id_test_accuracy)
+    print 'expression classification: ' + str(express_test_accuracy)
+    print 'avg pose regress' + str(avg_pose_regress)
+    print '***'
     return id_test_accuracy, express_test_accuracy, pose_regress, avg_pose_regress
 
 @scope.define
@@ -285,9 +267,9 @@ def fgs_bandit_evaluate(config=None):
     return record
 
 @scope.define
-def bandit_evaluate2(config=None, stats=None):
+def fgs_bandit_evaluate2(config=None, stats=None):
     dataset = mtdat.MTData_March082013()
-    imgs,labels = dataset.get_images(label_id)
+    imgs,labels = dataset.get_images(1)
     nIm = labels.shape[0]
     print 'Loading ' + str(nIm) + 'MTURK imgs...'
     features = get_features(imgs, config, verbose=False)
@@ -298,7 +280,7 @@ def bandit_evaluate2(config=None, stats=None):
 
     for neural_i in range(len(neuralname)):
         curr_neural = dataset.get_neural_labels(neural_i+1)
-        tmp = [sb.get_regression_results(features, curr_neural[:,ei]) for ei in range(4)]
+        tmp = np.array([sb.get_regression_results(features, curr_neural[:,ei]) for ei in range(4)])
         regress_r2[neuralname[neural_i]] = tmp
 
     results = {}
@@ -309,7 +291,7 @@ def bandit_evaluate2(config=None, stats=None):
     record['spec'] = config
     record['results'] = results
     record['attachments'] = {}
-    record['loss'] = 1 - (view_test_rsq + test_accuracy)/2
+    record['loss'] = 0
     record['status'] = 'ok'
     return record
 
@@ -325,4 +307,17 @@ def Simffa_FaceGen_L2Bandit(template=None):
     if template==None:
         template = sp.l2_params
     return scope.fgs_bandit_evaluate(template)
+
+
+@base.as_bandit()
+def Simffa_FaceGen_L3Bandit_v2(template=None):
+    if template==None:
+        template = sp.l3_params
+    return scope.fgs_bandit_evaluate2(template)
+
+@base.as_bandit()
+def Simffa_FaceGen_L2Bandit_v2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.fgs_bandit_evaluate2(template)
 
