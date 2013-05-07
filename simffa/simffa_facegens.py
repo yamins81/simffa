@@ -267,7 +267,7 @@ def fgs_bandit_evaluate(config=None):
     return record
 
 @scope.define
-def fgs_bandit_evaluate2(config=None, stats=None):
+def fgs_bandit_evaluate2(config=None):
     dataset = mtdat.MTData_March082013()
     imgs,labels = dataset.get_images(1)
     nIm = labels.shape[0]
@@ -285,7 +285,6 @@ def fgs_bandit_evaluate2(config=None, stats=None):
 
     results = {}
     results['regress_r2'] = regress_r2
-    results['feret_stats'] = stats
 
     record = {}
     record['spec'] = config
