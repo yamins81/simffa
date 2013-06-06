@@ -102,6 +102,7 @@ class DatasetBase(object):
         #tools.upload_s3_directory(gt.s3_resource_bucket, dir)
 
     def get_models(self):
+        print 'in get_models'
         objs = self.objects
         for o in objs:
             pth = self.obj_home(o)

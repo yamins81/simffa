@@ -7,24 +7,18 @@
 
 # Copyright (C) 2011
 # Authors:  Elias Issa and Dan Yamins
-
 # License: Simplified BSD
 
 
 import os
-from os import path
 import shutil
-from glob import glob
 import hashlib
 
 import numpy as np
-
 from skdata import larray
-
 from skdata.data_home import get_data_home
 from skdata.utils import download, extract, int_labels
 from skdata.utils.image import ImgLoader
-
 
 class BaseFaceBodyObject(object):
 
@@ -38,9 +32,7 @@ class BaseFaceBodyObject(object):
 
         if meta is not None:
             self._meta = meta
-
         self.name = self.__class__.__name__
-
         try:
             from joblib import Memory
             mem = Memory(cachedir=self.home('cache'))
@@ -49,11 +41,7 @@ class BaseFaceBodyObject(object):
             pass
 
     def home(self, *suffix_paths):
-        return path.join(get_data_home(), self.name, *suffix_paths)
-
-    # ------------------------------------------------------------------------
-    # -- Dataset Interface: fetch()
-    # ------------------------------------------------------------------------
+        return os.path.join(get_data_home(), self.name, *suffix_paths)
 
     def fetch(self, download_if_missing=True):
         """Download and extract the dataset."""
@@ -66,22 +54,22 @@ class BaseFaceBodyObject(object):
         # download archive
         url = self.URL
         sha1 = self.SHA1
-        basename = path.basename(url)
-        archive_filename = path.join(home, basename)
-        if not path.exists(archive_filename):
+        basename = os.path.basename(url)
+        archive_filename = os.path.join(home, basename)
+        if not os.path.exists(archive_filename):
             if not download_if_missing:
                 return
-            if not path.exists(home):
+            if not os.path.exists(home):
                 os.makedirs(home)
             download(url, archive_filename, sha1=sha1)
 
         # extract it
-        if not path.exists(self.home(self.SUBDIR)):
+        if not os.path.exists(self.home(self.SUBDIR)):
             extract(archive_filename, home, sha1=sha1, verbose=True)
 
-    # ------------------------------------------------------------------------
-    # -- Dataset Interface: meta
-    # ------------------------------------------------------------------------
+    def clean_up(self):
+        if os.path.isdir(self.home()):
+            shutil.rmtree(self.home())
 
     @property
     def meta(self):
@@ -157,41 +145,53 @@ class BaseFaceBodyObject(object):
                     splits['test_' + str(split_id)].append(cat[ind]['filename'])
         return splits
 
-    # ------------------------------------------------------------------------
-    # -- Dataset Interface: clean_up()
-    # ------------------------------------------------------------------------
 
-    def clean_up(self):
-        if path.isdir(self.home()):
-            shutil.rmtree(self.home())
-
-    # ------------------------------------------------------------------------
-    # -- Standard Tasks
-    # ------------------------------------------------------------------------
-
-    def raw_classification_task(self, split=None):
-        """Return image_paths, labels"""
-        if split:
-            inds = self.splits[split]
-        else:
-            inds = xrange(len(self.meta))
+    def get_images(self):
+        
+        tmp = np.array(self.meta)
+        inds = range(tmp.shape[0])
         image_paths = [self.meta[ind]['filename'] for ind in inds]
-        names = np.asarray([self.meta[ind]['name'] for ind in inds])
-        labels = int_labels(names)
-        return image_paths, labels
+        imgs = larray.lmap(ImgLoader(ndim=2, dtype='uint8', mode='L'), image_paths)
+        labels = [self.meta[i]['name'] == 'Face' for i in inds]
 
-    def img_classification_task(self, dtype='uint8', split=None):
-        img_paths, labels = self.raw_classification_task(split=split)
-        imgs = larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype=dtype, mode='L'),
-                           img_paths)
-        return imgs, labels
-
-
+        IMGS = np.array(imgs)
+        LABELS = np.array(labels)
+   
+        return IMGS, LABELS
 
 class FaceBodyObject20110803(BaseFaceBodyObject):
     URL = 'http://dicarlocox-datasets.s3.amazonaws.com/FaceBodyObject_2011_08_03.tar.gz'
     SHA1 = '088387e08ac008a0b8326e7dec1f0a667c8b71d0'
     SUBDIR = 'FaceBodyObject_2011_08_03'
 
+
+
+# def getFSI(features, labels):
+#     fs = features.shape
+#     if np.array(fs).shape[0] == 4:
+#         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
+#     mu_f = (features[labels,:]).mean(0)
+#     mu_nf = (features[~labels,:]).mean(0)
+    
+#     FSI = (mu_f - mu_nf) / (np.abs(mu_f + mu_nf)) 
+#     return FSI
+
+
+    # def raw_classification_task(self, split=None):
+    #     """Return image_paths, labels"""
+    #     if split:
+    #         inds = self.splits[split]
+    #     else:
+    #         inds = xrange(len(self.meta))
+    #     image_paths = [self.meta[ind]['filename'] for ind in inds]
+    #     names = np.asarray([self.meta[ind]['name'] for ind in inds])
+    #     labels = int_labels(names)
+    #     return image_paths, labels
+
+    # def img_classification_task(self, dtype='uint8', split=None):
+    #     img_paths, labels = self.raw_classification_task(split=split)
+    #     imgs = larray.lmap(ImgLoader(ndim=2, shape=(400,400), dtype=dtype, mode='L'),
+    #                        img_paths)
+    #     return imgs, labels
 
 
