@@ -18,7 +18,7 @@ def get_FERET_classification(features, labels, splits):
     if np.array(fs).shape[0] == 4:
         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
 
-    num_splits = len(splits)
+    num_splits = int(len(splits)/2)
     id_test_accuracy = 0
     view_test_rsq = 0
     for i in range(num_splits):
@@ -75,7 +75,19 @@ def feret_bandit_evaluate(config=None):
 
 
 @base.as_bandit()
-def Simffa_FeretTask_Bandit(template=None):
+def Simffa_FeretTask_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.feret_bandit_evaluate(template)
+
+@base.as_bandit()
+def Simffa_FeretTask_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.feret_bandit_evaluate(template)
+
+@base.as_bandit()
+def Simffa_FeretTask_Bandit_L3(template=None):
     if template==None:
         template = sp.l3_params
     return scope.feret_bandit_evaluate(template)

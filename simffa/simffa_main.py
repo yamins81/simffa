@@ -8,15 +8,43 @@ import pyll.stochastic as stochastic
 import pyll.base 
 import skdata.larray as larray
 
-import simffa_params as sp
-import simffa_bandit as sb
+import simffa.simffa_params as sp
+import simffa.simffa_bandit as sb
 
-import simffa_mtDat as mtdat
-import simffa_fboDat as fbo
+import simffa.simffa_fboDat as fbo
+import simffa.simffa_facegens as fgs 
+import simffa.simffa_mtDat as mtdat
+
+from mvpa2.suite import SimpleSOMMapper
+import cPickle
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+model_param = sp.l3_params
+conf = stochastic.sample(model_param, np.random.RandomState(0))
+
+record = fgs.fgs_bandit_evaluate3(conf)
+maps = record['results']['maps']
+map_types = ['id', 'pose', 'expression']
+for m in map_types:
+	plt.figure()
+	plt.imshow(maps[m])
+	plt.savefig(m + '_map.png')
+
+with open (os.path.join('maps.pkl'), 'w') as _f:
+		cPickle.dump(maps, _f)  
+
+
+model_param = sp.l3_params
+conf = stochastic.sample(model_param, np.random.RandomState(0))
+
+dataset = fbo.FaceBodyObject20110803()
+imgs, labels = dataset.get_images()
+features = sb.get_features(imgs, conf)
+fsi = fbo.getFSI(features, labels)
+
 
 
 # load MTurk image data - with nInvar number of invariant reps

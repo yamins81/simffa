@@ -196,11 +196,12 @@ def block_until_done(trials, poll_interval_secs):
     trials.refresh()
 
 def reExtract(job_old, new_bandit, new_id):
-    
+    old_bandit_tag = job_old['misc']['cmd'][1][-3:]
     new_misc = copy.deepcopy(job_old['misc'])
     new_misc['tid'] = new_id
     new_misc['task_stats'] = job_old['result']['results']
-    new_misc['cmd'][1] = new_bandit
+
+    new_misc['cmd'][1] = new_bandit + old_bandit_tag
     new_result = {'status': hyperopt.STATUS_NEW}
     new_docs = new_trials.new_trial_docs([new_id],
                 [None], [new_result], [new_misc])

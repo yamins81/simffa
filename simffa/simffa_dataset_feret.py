@@ -88,12 +88,13 @@ class FeretData(object):
             seed = np.random.randint(1000000) 
             num_subjects = 8
             num_splits = 10
-            subject_id = np.array([self.meta[ind]['subject_id'] for i in len(meta)])
             
-            self._splits = self.get_splits_by_subjectID(seed, num_subjects, subject_id, num_splits)
+            
+            self._splits = self.get_splits_by_subjectID(seed, num_subjects, num_splits)
         return self._splits
 
-    def get_splits_by_subjectID(seed, num_subjects, subject_id, num_splits):
+    def get_splits_by_subjectID(self, seed, num_subjects, num_splits):
+        subject_id = np.array([self.meta[ind]['subject_id'] for i in range(len(meta))])
         unique_id = np.unique(subject_id)
         if num_subjects > unique_id.shape[0]:
             num_subjects = unique_id.shape[0]
@@ -108,7 +109,7 @@ class FeretData(object):
             splits['test_' + str(split_id)] = []
 
             for i in range(num_subjects):
-                iMlbl_i = [j for j in range(nIm) if subject_id == unique_id[i]]
+                iMlbl_i = [j for j in range(nIm) if subject_id[j] == unique_id[i]]
                 perm_i = rng.permutation(len(iMlbl_i))
                 perm = [iMlbl_i[p_i] for p_i in perm_i]
                 for ind in perm[:len(perm)/2]:

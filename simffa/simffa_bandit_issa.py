@@ -14,7 +14,7 @@ def get_regression_result(features, labels, splits):
         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
     
     rsq = 0;
-    num_splits = len(splits)
+    num_splits = int(len(splits)/2)
     for ind in range(num_splits):
         train_inds = np.array(splits['train_' + str(ind)])
         test_inds = np.array(splits['test_' + str(ind)])
@@ -186,19 +186,46 @@ def issa_evaluate_allComparisons(config=None):
 #     return record
 
 
+# neural fits
+@base.as_bandit()
+def Simffa_IssaNeural_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.issa_evaluate_neuralComparisons(template)
 
 @base.as_bandit()
-def Simffa_IssaNeural_Bandit(template=None):
+def Simffa_IssaNeural_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.issa_evaluate_neuralComparisons(template)
+
+@base.as_bandit()
+def Simffa_IssaNeural_Bandit_L3(template=None):
     if template==None:
         template = sp.l3_params
     return scope.issa_evaluate_neuralComparisons(template)
 
+# psych fits
 @base.as_bandit()
-def Simffa_IssaPsych_Bandit(template=None):
+def Simffa_IssaPsych_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.issa_evaluate_psychComparisons(template)
+
+@base.as_bandit()
+def Simffa_IssaPsych_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.issa_evaluate_psychComparisons(template)
+
+@base.as_bandit()
+def Simffa_IssaPsych_Bandit_L3(template=None):
     if template==None:
         template = sp.l3_params
     return scope.issa_evaluate_psychComparisons(template)
 
+    
+# both fits
 @base.as_bandit()
 def Simffa_IssaGeneral_Bandit(template=None):
     if template==None:

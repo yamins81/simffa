@@ -109,12 +109,18 @@ class MTData(object):
             seed = self.seed
             ntrain = self.ntrain
             ntest = self.ntest
+
             num_splits = self.num_splits
             self._splits = self.get_regression_splits(seed, num_splits)
         return self._splits
 
-    def get_regression_splits(seed, num_splits):
-        nIm = np.array(labels).shape[0]
+    def get_regression_splits(self, seed, num_splits):
+        x = np.array([ np.isnan(self.get_neural_labels(i+1)[:,0]) for i in range(3)])
+        t = np.nonzero(np.logical_or(x[0,:], x[1,:], x[2,:]))
+        t = np.array(t).T
+
+        nIm = len(t)
+        print nIm
         ntrain = int(0.75 * nIm)
         ntest = int(0.25 * nIm)
 
@@ -126,16 +132,16 @@ class MTData(object):
             
             perm = rng.permutation(nIm)
             for ind in perm[:ntrain]:
-                splits['train_' + str(split_id)].append(ind)
+                splits['train_' + str(split_id)].append(t[ind])
             for ind in perm[ntrain: ntrain + ntest]:
-                splits['test_' + str(split_id)].append(ind)
+                splits['test_' + str(split_id)].append(t[ind])
         return splits
 
     def get_neural_labels(self, neural_id=1):
         label_name = 'neural' + str(neural_id)
         tmp = np.array(self.meta)
         inds = range(tmp.shape[0])
-        labels = np.asarray([self.meta[ind][label_name] for ind in inds])
+        labels = np.asarray([np.double(self.meta[ind][label_name]) for ind in inds])
         LABELS = np.array(labels)   
         return LABELS
 

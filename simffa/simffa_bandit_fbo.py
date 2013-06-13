@@ -56,7 +56,19 @@ def fbo_bandit_evaluateFSI(config=None):
     return record
 
 @base.as_bandit()
-def Simffa_FboFSI_Bandit(template=None):
+def Simffa_FboFSI_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.fbo_bandit_evaluateFSI(template)
+
+@base.as_bandit()
+def Simffa_FboFSI_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.fbo_bandit_evaluateFSI(template)
+
+@base.as_bandit()
+def Simffa_FboFSI_Bandit_L3(template=None):
     if template==None:
         template = sp.l3_params
     return scope.fbo_bandit_evaluateFSI(template)

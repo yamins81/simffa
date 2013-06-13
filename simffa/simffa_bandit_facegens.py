@@ -26,14 +26,15 @@ def get_classification_result(labels, train_X, test_X, train_inds, test_inds):
     return test_accuracy
 
 def evaluate_on_tasks(features, labels, splits):
-    fs = features.shape
-    if np.array(fs).shape[0] == 4:
+    fs = np.array(features.shape)
+    if fs.shape[0] == 4:
         features = features.reshape(fs[0], fs[1]*fs[2]*fs[3])
 
     id_test_accuracy = 0
     express_test_accuracy = 0
     pose_regress = 0
 
+    num_splits = int(len(splits)/2)
     for i in range(num_splits):
         train_inds = np.array(splits['train_' + str(i)])
         test_inds = np.array(splits['test_' + str(i)])
@@ -51,7 +52,7 @@ def evaluate_on_tasks(features, labels, splits):
     print '***'
     print 'identity classification: ' + str(id_test_accuracy)
     print 'expression classification: ' + str(express_test_accuracy)
-    print 'avg pose regress' + str(avg_pose_regress)
+    print ' pose regress' + str(pose_regress)
     print '***'
     return id_test_accuracy, express_test_accuracy, pose_regress
 
@@ -114,10 +115,23 @@ def fgs_evaluate_spaceMap(config=None):
 ## bandits ##
 """" face tasks """
 @base.as_bandit()
-def Simffa_FaceGenTasks_Bandit(template=None):
+def Simffa_FaceGenTasks_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.fgs_evaluate_faceTasks(template)
+
+@base.as_bandit()
+def Simffa_FaceGenTasks_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.fgs_evaluate_faceTasks(template)
+
+@base.as_bandit()
+def Simffa_FaceGenTasks_Bandit_L3(template=None):
     if template==None:
         template = sp.l3_params
     return scope.fgs_evaluate_faceTasks(template)
+
 
 # """ compare to neurons """
 # @base.as_bandit()
@@ -128,10 +142,23 @@ def Simffa_FaceGenTasks_Bandit(template=None):
 
 """ map to space """
 @base.as_bandit()
-def Simffa_FaceGenMap_Bandit(template=None):
+def Simffa_FaceGenMap_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.fgs_evaluate_faceTasks(template)
+
+@base.as_bandit()
+def Simffa_FaceGenMap_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.fgs_evaluate_faceTasks(template)
+    
+@base.as_bandit()
+def Simffa_FaceGenMap_Bandit_L3(template=None):
     if template==None:
         template = sp.l3_params
-    return scope.fgs_evaluate_spaceMap(template)
+    return scope.fgs_evaluate_faceTasks(template)
+
 
 # """ compute fsi"""
 # @base.as_bandit()
