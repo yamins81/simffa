@@ -33,7 +33,7 @@ def fbo_bandit_evaluateFSI(config=None):
     FSI = fbo.getFSI(fbo_features, labels)
     
     dataset = hvm.HvMWithDiscfade()
-    imgs = dataset.get_images('float32', {'size': (400, 400), 'global_normalize': True})
+    imgs = dataset.get_images(, {'size': (400, 400), 'global_normalize': True})
     hvm_features = sb.get_features(imgs, config)
     
     attachments = {}

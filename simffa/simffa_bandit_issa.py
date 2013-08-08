@@ -22,8 +22,7 @@ def get_regression_result(features, labels, splits):
         test_X = features[test_inds]
         train_y = labels[train_inds]
         test_y = labels[test_inds]
-        train_Xy = (train_X, train_y)
-        test_Xy = (test_X, test_y)
+        train_Xy = (train_X, train_y) test_Xy = (test_X, test_y)
         result = train_scikits(train_Xy, test_Xy, 'pls.PLSRegression', regression=True)
         rsq = rsq+result[1]['test_rsquared']
     rsq = rsq / num_splits

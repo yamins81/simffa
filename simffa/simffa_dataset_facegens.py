@@ -7,6 +7,7 @@ import numpy as np
 from skdata import larray
 from skdata.utils import download, extract, int_labels
 from skdata.utils.image import ImgLoader
+from simffa.simffa_utils import ImgLoaderResizer
 from skdata.data_home import get_data_home
 
 class FaceGenData(object):
@@ -137,6 +138,14 @@ class FaceGenData(object):
         tmp = np.array(self.meta)
         inds = range(tmp.shape[0])
         image_paths = [self.meta[ind]['filename'] for ind in inds]
+
+        # size = (400,400)
+        # imgs = larray.lmap(ImgLoaderResizer(inshape=(256, 256),
+        #                                     shape=size,
+        #                                     dtype='float32',
+        #                                     normalize=True),
+        #                         image_paths)
+
         imgs = larray.lmap(ImgLoader(ndim=2, dtype='uint8', mode='L'), image_paths)
         labels = np.asarray([ (self.meta[ind]['subject_id'], self.meta[ind]['express_id'], 
             self.meta[ind]['s'], self.meta[ind]['ty'],self.meta[ind]['tz'],
