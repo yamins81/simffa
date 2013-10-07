@@ -25,7 +25,7 @@ def getFSI(features, labels):
     return FSI
 
 @scope.define
-def fbo_bandit_evaluateFSI(config=None):
+def fbo_bandit_evaluateFSI_HvM(config=None):
     
     dataset = fbo.FaceBodyObject20110803()
     imgs, labels = dataset.get_images()
@@ -54,6 +54,33 @@ def fbo_bandit_evaluateFSI(config=None):
     record['loss'] = 0
     record['status'] = 'ok'
     return record
+
+@scope.define
+def fbo_bandit_evaluateFSI(config=None):
+    
+    dataset = fbo.FaceBodyObject20110803()
+    imgs, labels = dataset.get_images()
+    fbo_features = sb.get_features(imgs, config)
+    FSI = fbo.getFSI(fbo_features, labels)
+    
+    attachments = {}
+    attachments['fbo_features'] = fbo_features
+    attachments['FSI'] = FSI
+    
+    # fn = save_features('/hyperopt_features/facegen_fsi/', attachments)
+
+    results = {}
+    # results['feature_fn'] = fn
+    results['FSI'] = FSI
+    
+    record = {}
+    record['spec'] = config
+    record['results'] = results
+    record['attachments'] = {}
+    record['loss'] = 0
+    record['status'] = 'ok'
+    return record
+
 
 @base.as_bandit()
 def Simffa_FboFSI_Bandit_V1(template=None):
