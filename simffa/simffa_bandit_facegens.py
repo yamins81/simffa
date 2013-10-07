@@ -87,6 +87,38 @@ def fgs_evaluate_faceTasks(config=None):
     return record
 
 @scope.define
+def fgs_evaluate_faceTasks_withFSI(config=None):
+    import simffa.simffa_bandit_fbo as fbo 
+    dataset = fgs.FaceGen_small_var0()
+    imgs,labels = dataset.get_images()
+    splits = dataset.splits
+    features = get_features(imgs, config, verbose=False)
+    
+    nIm = labels.shape[0]
+    nLabels = labels.shape[1]
+    fs = features.shape
+    
+    accuracy1, accuracy2, accuracy3 = evaluate_on_tasks(features, labels, splits)
+    results = {}
+    results['id_accuracy'] = accuracy1
+    results['express_accuracy'] = accuracy2
+    results['pose_accuracy'] = accuracy3
+    results['fs'] = fs
+
+    rec = fbo.fbo_bandit_evaluateFSI(config)
+
+    record = {}
+    record['spec'] = config
+    record['results'] = results
+    record['fsi_results'] = rec['results']
+    record['attachments'] = {}
+    record['loss'] = 1 - (accuracy1 + accuracy2 + accuracy3)/3.0
+    record['status'] = 'ok'
+
+    return record
+
+
+@scope.define
 def fgs_evaluate_spaceMap(config=None):
     
     # dataset = FaceGen_small_var0()
@@ -132,6 +164,24 @@ def Simffa_FaceGenTasks_Bandit_L3(template=None):
         template = sp.l3_params
     return scope.fgs_evaluate_faceTasks(template)
 
+""" face tasks with fsi """
+@base.as_bandit()
+def Simffa_FaceGenTasksFSI_Bandit_V1(template=None):
+    if template==None:
+        template = sp.v1like_params
+    return scope.fgs_evaluate_faceTasks_withFSI(template)
+
+@base.as_bandit()
+def Simffa_FaceGenTasksFSI_Bandit_L2(template=None):
+    if template==None:
+        template = sp.l2_params
+    return scope.fgs_evaluate_faceTasks_withFSI(template)
+
+@base.as_bandit()
+def Simffa_FaceGenTasksFSI_Bandit_L3(template=None):
+    if template==None:
+        template = sp.l3_params
+    return scope.fgs_evaluate_faceTasks_withFSI(template)
 
 # """ compare to neurons """
 # @base.as_bandit()

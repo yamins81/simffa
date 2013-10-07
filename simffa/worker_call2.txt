@@ -1,0 +1,34 @@
+starcluster spothistory -p cg1.4xlarge 
+starcluster addnode -I cc2.8xlarge -i ami-4583572c rishi -b 1.20
+starcluster addnode -I m1.large -i ami-999d49f0 rishi -b 1.20
+starcluster addnode -I cg1.4xlarge -i ami-4583572c rishi -b 1.20
+
+ssh -f -N -L 22334:localhost:22334 devthor@dicarlo2.mit.edu
+export PYTHONPATH=$PYTHONPATH:/home/simffa
+THEANO_FLAGS=device=gpu0,floatX=float32
+
+# on master
+import simffa_test as e
+exp = e.simffa_facegen_task_withFSI(dbname='simffa_facegen_fsi')
+exp.run(200, block_until_done=True)
+
+# on worker
+./hyperopt-mongo-worker --mongo=localhost:22334/simffa_facegen_fsi --poll-interval=5
+
+# to see available jobs
+import pymongo as pm
+c = pm.Connection('localhost', 22334)
+db = c['simffa_07062013_fgs']
+j = db['jobs']
+print j.count()
+print '0:' + str(len(list(j.find({'state':0}))))
+print '1:' + str(len(list(j.find({'state':1}))))
+print '2:' + str(len(list(j.find({'state':2}))))
+print '3:' + str(len(list(j.find({'state':3}))))
+
+# job analysis
+ipython notebook --pylab=inline
+
+# drop database
+import pymongo as pm
+pm.Connection('localhost', 22334).drop_database('simffa_facegen_var0_fsi')

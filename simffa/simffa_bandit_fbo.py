@@ -12,7 +12,7 @@ from simffa_utils import get_features
 from simffa_utils import save_features
 
 import simffa.simffa_dataset_fbo as fbo
-import dldata.HvM.neural_datasets as hvm
+# import dldata.HvM.neural_datasets as hvm
 
 def getFSI(features, labels):
     fs = features.shape
@@ -24,48 +24,48 @@ def getFSI(features, labels):
     FSI = (mu_f - mu_nf) / (np.abs(mu_f + mu_nf)) 
     return FSI
 
-@scope.define
-def fbo_bandit_evaluateFSI_HvM(config=None):
+# @scope.define
+# def fbo_bandit_evaluateFSI_HvM(config=None):
     
-    dataset = fbo.FaceBodyObject20110803()
-    imgs, labels = dataset.get_images()
-    fbo_features = sb.get_features(imgs, config)
-    FSI = fbo.getFSI(fbo_features, labels)
+#     dataset = fbo.FaceBodyObject20110803()
+#     imgs, labels = dataset.get_images()
+#     fbo_features = sb.get_features(imgs, config)
+#     FSI = fbo.getFSI(fbo_features, labels)
     
-    dataset = hvm.HvMWithDiscfade()
-    imgs = dataset.get_images(, {'size': (400, 400), 'global_normalize': True})
-    hvm_features = sb.get_features(imgs, config)
+#     dataset = hvm.HvMWithDiscfade()
+#     imgs = dataset.get_images(, {'size': (400, 400), 'global_normalize': True})
+#     hvm_features = sb.get_features(imgs, config)
     
-    attachments = {}
-    attachments['hvm_features'] = hvm_features
-    attachments['fbo_features'] = fbo_features
-    attachments['FSI'] = FSI
+#     attachments = {}
+#     attachments['hvm_features'] = hvm_features
+#     attachments['fbo_features'] = fbo_features
+#     attachments['FSI'] = FSI
     
-    fn = save_features('/hyperopt_features/facegen_fsi/', attachments)
+#     fn = save_features('/hyperopt_features/facegen_fsi/', attachments)
 
-    results = {}
-    results['feature_fn'] = fn
-    results['FSI'] = FSI
+#     results = {}
+#     results['feature_fn'] = fn
+#     results['FSI'] = FSI
     
-    record = {}
-    record['spec'] = config
-    record['results'] = results
-    record['attachments'] = {}
-    record['loss'] = 0
-    record['status'] = 'ok'
-    return record
+#     record = {}
+#     record['spec'] = config
+#     record['results'] = results
+#     record['attachments'] = {}
+#     record['loss'] = 0
+#     record['status'] = 'ok'
+#     return record
 
 @scope.define
 def fbo_bandit_evaluateFSI(config=None):
     
     dataset = fbo.FaceBodyObject20110803()
     imgs, labels = dataset.get_images()
-    fbo_features = sb.get_features(imgs, config)
-    FSI = fbo.getFSI(fbo_features, labels)
+    fbo_features = get_features(imgs, config)
+    FSI = getFSI(fbo_features, labels)
     
-    attachments = {}
-    attachments['fbo_features'] = fbo_features
-    attachments['FSI'] = FSI
+    # attachments = {}
+    # attachments['fbo_features'] = fbo_features
+    # attachments['FSI'] = FSI
     
     # fn = save_features('/hyperopt_features/facegen_fsi/', attachments)
 
@@ -100,4 +100,8 @@ def Simffa_FboFSI_Bandit_L3(template=None):
         template = sp.l3_params
     return scope.fbo_bandit_evaluateFSI(template)
 
+# general case
+@base.as_bandit()
+def Simffa_FboFSI_Bandit(template=None):
+    return scope.fbo_bandit_evaluateFSI(template)
                   
